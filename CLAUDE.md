@@ -24,6 +24,8 @@ langsplain/
     ├── diagram.js      # Interactive SVG transformer diagram with D3.js
     ├── attention-demo.js   # Self-attention visualization
     ├── moe-demo.js     # Mixture of Experts routing simulation
+    ├── sampling-demo.js    # Sampling strategies visualization
+    ├── kv-cache-demo.js    # KV cache visualization
     ├── tour.js         # Guided tour system
     ├── tokenizer.js    # BPE-style tokenization demo
     └── math-utils.js   # Softmax, matrix operations, utilities
@@ -44,8 +46,10 @@ The demos use a simplified transformer model for visualization purposes:
 2. **Guided Tour** - Step-by-step architecture walkthrough
 3. **Attention Demo** - Visualize self-attention with user input
 4. **MOE Demo** - Show Mixture of Experts routing decisions
-5. **Glossary** - Searchable ML/AI terminology reference
-6. **Responsive Design** - Works on mobile, tablet, desktop
+5. **Sampling Demo** - Explore temperature, top-k, and top-p decoding
+6. **KV Cache Demo** - Compare cached vs uncached generation cost
+7. **Glossary** - Searchable ML/AI terminology reference
+8. **Responsive Design** - Works on mobile, tablet, desktop
 
 ## Development Guidelines
 
@@ -130,6 +134,8 @@ npx serve .
 - [ ] Guided tour progresses correctly
 - [ ] Attention demo works with various inputs
 - [ ] MOE demo shows routing decisions
+- [ ] Sampling demo updates distributions correctly
+- [ ] KV cache demo updates counters/savings correctly
 - [ ] Glossary search functional
 - [ ] Dark mode toggles properly
 - [ ] Responsive on mobile/tablet/desktop

@@ -132,26 +132,31 @@ output = weights @ V</code></pre>
         `
     },
     residuals: {
-        title: 'Residual Connections',
+        title: 'Residual + LayerNorm',
         simple: `
             <p>Residual connections are "shortcuts" that add the input directly to the output of each layer. Think of it as saying "keep what you had, plus add this new information".</p>
-            <p>This helps with two things: gradients can flow more easily during training, and the model can choose to "pass through" information unchanged when needed.</p>
+            <p>Layer normalization (LayerNorm) is usually paired with these residual paths to keep activations in a stable range as signals move through many layers.</p>
+            <p>Together, they help gradients flow during training and let the model preserve useful information across deep stacks.</p>
         `,
         technical: `
-            <div class="formula">
-                output = LayerNorm(x + Sublayer(x))
-            </div>
+            <p>Modern decoder-only LLMs usually use <strong>pre-norm</strong> blocks:</p>
+            <div class="formula">y = x + Sublayer(LayerNorm(x))</div>
+            <p>The original Transformer paper used <strong>post-norm</strong>:</p>
+            <div class="formula">y = LayerNorm(x + Sublayer(x))</div>
             <p>Benefits:</p>
             <ul>
                 <li><strong>Gradient flow:</strong> Prevents vanishing gradients in deep networks</li>
                 <li><strong>Identity mapping:</strong> Easy for layers to learn identity function</li>
-                <li><strong>Ensemble effect:</strong> Exponential paths through the network</li>
+                <li><strong>Activation stability:</strong> LayerNorm reduces internal scale drift</li>
             </ul>
             <p><strong>Pre-norm vs Post-norm:</strong></p>
-            <pre><code>// Post-norm (original)
+            <pre><code>// Pre-norm (common in modern LLMs)
 x = x + Attention(LayerNorm(x))
-// Pre-norm (more stable, common now)
-x = LayerNorm(x + Attention(x))</code></pre>
+x = x + FFN(LayerNorm(x))
+
+// Post-norm (original Transformer)
+x = LayerNorm(x + Attention(x))
+x = LayerNorm(x + FFN(x))</code></pre>
         `
     },
     ffn: {
@@ -184,6 +189,7 @@ x = LayerNorm(x + Attention(x))</code></pre>
             <p>Instead of one big feed-forward network, MOE uses many smaller "expert" networks. A router decides which experts to use for each token.</p>
             <p>This allows models to be much larger while keeping computation manageable - only a few experts are active for each token.</p>
             <p>Mixtral uses 8 experts but only activates 2 per token, achieving better performance than dense models of similar compute cost.</p>
+            <p><em>Note:</em> in this demo, expert labels and routing cues are intentionally simplified so behavior is easier to see.</p>
         `,
         technical: `
             <div class="formula">
@@ -199,6 +205,7 @@ x = LayerNorm(x + Attention(x))</code></pre>
                 <li><strong>Expert capacity:</strong> Maximum tokens per expert per batch</li>
                 <li><strong>Routing strategies:</strong> Top-k, expert choice, or hash-based</li>
             </ul>
+            <p>In production MOE models, experts are not hand-labeled by topic; specialization emerges from training.</p>
             <p>Example: Mixtral 8x7B has 46.7B total params but only 12.9B active.</p>
         `
     },
@@ -239,24 +246,6 @@ x = LayerNorm(x + Attention(x))</code></pre>
             </ul>
             <p><strong>KV Caching:</strong> Store computed K,V for previous tokens to avoid recomputation.</p>
         `
-    },
-    layernorm: {
-        title: 'Layer Normalization',
-        simple: `
-            <p>Layer normalization keeps the numbers in a stable range as they pass through the network. Without it, values could grow very large or very small, making training difficult.</p>
-            <p>It works by adjusting each layer's output to have a consistent mean and spread.</p>
-        `,
-        technical: `
-            <div class="formula">
-                LayerNorm(x) = γ · (x - μ) / √(σ² + ε) + β
-            </div>
-            <p>Where μ and σ² are computed across the feature dimension.</p>
-            <p><strong>RMSNorm</strong> variant (simpler, used in LLaMA):</p>
-            <div class="formula">
-                RMSNorm(x) = x / RMS(x) · γ
-            </div>
-            <p>RMS(x) = √(mean(x²))</p>
-        `
     }
 };
 
@@ -268,7 +257,7 @@ const GLOSSARY = [
     { term: 'Causal Mask', definition: 'A triangular mask applied to attention scores that prevents tokens from attending to future positions, ensuring autoregressive generation.' },
     { term: 'Decoder-only', definition: 'A transformer architecture (like GPT) that uses only the decoder stack with causal masking, as opposed to encoder-decoder models.' },
     { term: 'Embedding', definition: 'A dense vector representation of a token that captures semantic meaning in a continuous space, typically 768-8192 dimensions.' },
-    { term: 'Expert (in MOE)', definition: 'A specialized feed-forward sub-network within a Mixture of Experts layer that processes a subset of tokens based on the router\'s decision.' },
+    { term: 'Expert (in MOE)', definition: 'A feed-forward sub-network within a Mixture of Experts layer that processes a subset of tokens selected by the router; experts can specialize during training.' },
     { term: 'Feed-Forward Network', definition: 'A two-layer neural network applied independently to each position, typically expanding then contracting the hidden dimension.' },
     { term: 'GELU', definition: 'Gaussian Error Linear Unit, a smooth activation function commonly used in transformers: GELU(x) = x · Φ(x).' },
     { term: 'KV Cache', definition: 'A memory optimization that stores previously computed Key and Value tensors during generation to avoid redundant computation.' },

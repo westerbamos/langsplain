@@ -32,8 +32,8 @@ const TOUR_STEPS = [
     {
         target: '#residual-1',
         componentKey: 'residual1',
-        title: 'Residual Connections',
-        content: 'Skip connections add the input back to the output, helping gradients flow during training and allowing information to bypass layers when helpful.',
+        title: 'Residual + LayerNorm',
+        content: 'Skip connections add the input back to the output, while LayerNorm keeps activations stable. Together they help deep transformer stacks train reliably.',
         position: 'right'
     },
     {

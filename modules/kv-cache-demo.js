@@ -87,7 +87,7 @@ export class KVCacheDemoUI {
                                 <span class="counter-value" id="cached-kv-ops">0</span>
                             </div>
                             <div class="counter-item">
-                                <span class="counter-label">Attention Ops</span>
+                                <span class="counter-label">Q·K Score Ops</span>
                                 <span class="counter-value" id="cached-attn-ops">0</span>
                             </div>
                         </div>
@@ -115,7 +115,7 @@ export class KVCacheDemoUI {
                                 <span class="counter-value warning" id="uncached-kv-ops">0</span>
                             </div>
                             <div class="counter-item">
-                                <span class="counter-label">Attention Ops</span>
+                                <span class="counter-label">Q·K Score Ops</span>
                                 <span class="counter-value" id="uncached-attn-ops">0</span>
                             </div>
                         </div>
@@ -143,6 +143,7 @@ export class KVCacheDemoUI {
                     <ul>
                         <li><strong>With Cache:</strong> Only compute K,V for the NEW token, reuse cached values for previous tokens</li>
                         <li><strong>Without Cache:</strong> Recompute K,V for ALL tokens at every step (O(n) vs O(1) per token)</li>
+                        <li><strong>What this counter tracks:</strong> K/V projection savings only. Q·K attention score work is shown separately.</li>
                         <li><strong>Memory Trade-off:</strong> Cache uses GPU memory proportional to sequence length</li>
                     </ul>
                     <p class="hint">
@@ -385,7 +386,8 @@ export class KVCacheDemoUI {
             const saved = uncachedTotal - cachedTotal;
             savingsDetail.innerHTML = `
                 <strong>${saved}</strong> K/V computations saved
-                (${cachedTotal} with cache vs ${uncachedTotal} without)
+                (${cachedTotal} with cache vs ${uncachedTotal} without).
+                Q·K score ops are unchanged.
             `;
         } else {
             savingsDetail.textContent = 'Generate tokens to see savings accumulate';

@@ -596,6 +596,8 @@ export class AttentionDemoUI {
     updateExplanation() {
         const container = this.container.querySelector('#demo-explanation');
         const n = this.result.tokens.length;
+        const perHeadLayerPairs = (n * (n + 1)) / 2;
+        const totalScoreComputations = perHeadLayerPairs * CONFIG.numHeads * CONFIG.numLayers;
 
         container.innerHTML = `
             <p><strong>Layer ${this.currentLayer + 1}, Head ${this.currentHead + 1}</strong></p>
@@ -604,8 +606,8 @@ export class AttentionDemoUI {
                 The causal mask prevents attending to future tokens (shown as "-").
             </p>
             <p>
-                ${n} tokens × ${CONFIG.numHeads} heads × ${CONFIG.numLayers} layers =
-                ${n * CONFIG.numHeads * CONFIG.numLayers} attention computations
+                ${perHeadLayerPairs} token pairs/head/layer × ${CONFIG.numHeads} heads × ${CONFIG.numLayers} layers =
+                ${totalScoreComputations} attention score computations
             </p>
         `;
     }

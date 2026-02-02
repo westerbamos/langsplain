@@ -8,6 +8,8 @@ An interactive educational web application that explains how modern decoder-only
 - **Guided Tour**: Step-by-step walkthrough of the entire architecture
 - **Attention Demo**: Visualize self-attention patterns with your own text
 - **MOE Demo**: See how Mixture of Experts routing works
+- **Sampling Demo**: Compare temperature, top-k, and top-p decoding behavior
+- **KV Cache Demo**: Visualize why cache reuse speeds up autoregressive generation
 - **Glossary**: Searchable reference of key terms
 - **Responsive Design**: Works on desktop, tablet, and mobile
 
@@ -46,6 +48,8 @@ langsplain/
 │   ├── diagram.js      # SVG diagram with D3.js
 │   ├── attention-demo.js   # Attention visualization
 │   ├── moe-demo.js     # MOE routing simulation
+│   ├── sampling-demo.js    # Sampling strategies visualization
+│   ├── kv-cache-demo.js    # KV cache visualization
 │   ├── tour.js         # Guided tour system
 │   ├── tokenizer.js    # BPE-style tokenization
 │   └── math-utils.js   # Softmax, matrix operations

@@ -22,14 +22,14 @@ const CONFIG = {
         '#ec4899'  // pink
     ],
     expertNames: [
-        'Grammar',
-        'Facts',
-        'Math',
-        'Code',
-        'Creative',
-        'Logic',
-        'Language',
-        'General'
+        'Expert 1',
+        'Expert 2',
+        'Expert 3',
+        'Expert 4',
+        'Expert 5',
+        'Expert 6',
+        'Expert 7',
+        'Expert 8'
     ]
 };
 
@@ -202,8 +202,9 @@ export class MOEDemoUI {
                 <div class="demo-header">
                     <h2>Mixture of Experts</h2>
                     <p class="demo-description">
-                        Watch how a router assigns tokens to specialized expert networks.
+                        Watch how a router assigns tokens to experts.
                         Each token activates only ${CONFIG.topK} of ${CONFIG.numExperts} experts.
+                        This demo adds lightweight rule-based biasing so routing patterns are easier to inspect.
                     </p>
                 </div>
 
@@ -547,6 +548,10 @@ export class MOEDemoUI {
                 ${this.result.tokens.length} tokens routed to top-${CONFIG.topK} of ${CONFIG.numExperts} experts.
                 Ideal distribution: ${lb.idealCount.toFixed(1)} tokens per expert.
                 Load imbalance: ${lb.avgImbalance.toFixed(2)} average, ${lb.maxImbalance.toFixed(1)} max.
+            </p>
+            <p class="hint">
+                This demo intentionally uses token-category biasing so routing is legible.
+                Real MOE routers are learned continuous functions of hidden states.
             </p>
             <p class="hint">
                 In real MOE models, auxiliary losses encourage load balancing to prevent
