@@ -191,7 +191,10 @@ function getInferenceLayout(width) {
     const sidePadding = 20;
     const laneGap = 36;
     const laneInset = 8;
-    const minLaneSeparation = 14;
+    const decodeInsetRight = 20;
+    const kvWritePortRatioWide = 0.5;
+    const kvWritePortInsetNarrow = 2;
+    const kvReadPortRatio = 0.5;
     const kvMinWidth = 150;
     const kvMaxWidth = COMPONENTS.kvCache.width;
     const kvWidth = Math.max(kvMinWidth, Math.min(kvMaxWidth, width - 40));
@@ -203,10 +206,9 @@ function getInferenceLayout(width) {
         const mainX = Math.max(12, (width - totalWidth) / 2);
         const mainRight = mainX + wideMainWidth;
         const kvX = mainRight + laneGap;
-        const leftLane = mainRight + laneInset;
-        const rightLane = kvX - laneInset;
-        const laneSeparation = rightLane - leftLane;
-        const canSplitLanes = laneSeparation >= minLaneSeparation;
+        const loopLaneX = mainRight + laneInset;
+        const kvWritePortX = kvX + kvWidth * kvWritePortRatioWide;
+        const kvWriteLaneX = kvWritePortX;
 
         return {
             mode: 'wide',
@@ -215,9 +217,12 @@ function getInferenceLayout(width) {
             kvX,
             kvY: BASE_LAYOUT.kvY,
             kvWidth,
-            loopLaneX: canSplitLanes ? leftLane : leftLane,
-            kvLaneX: canSplitLanes ? rightLane : leftLane,
-            simplifiedCacheRoute: !canSplitLanes,
+            loopLaneX,
+            kvWriteLaneX,
+            kvWritePortX,
+            kvReadPortX: kvX + kvWidth * kvReadPortRatio,
+            decodeInX: mainRight - decodeInsetRight,
+            decodeInY: COMPONENTS.sampling.y + COMPONENTS.sampling.height / 2,
             detokenizeY: BASE_LAYOUT.detokenizeY,
             height: BASE_LAYOUT.height
         };
@@ -229,7 +234,8 @@ function getInferenceLayout(width) {
     const kvY = COMPONENTS.autoregressiveLoop.y + COMPONENTS.autoregressiveLoop.height + 10;
     const kvX = Math.max(12, width - kvWidth - 20);
     const detokenizeY = kvY + COMPONENTS.kvCache.height + 26;
-    const kvLaneX = Math.min(width - 10, Math.max(mainRight + 10, kvX + kvWidth - 6));
+    const loopLaneX = Math.min(width - 24, mainRight + laneInset + 2);
+    const kvWriteLaneX = Math.min(width - 8, kvX + kvWidth - kvWritePortInsetNarrow);
 
     return {
         mode: 'narrow',
@@ -238,9 +244,12 @@ function getInferenceLayout(width) {
         kvX,
         kvY,
         kvWidth,
-        loopLaneX: Math.min(width - 20, mainRight + 16),
-        kvLaneX,
-        simplifiedCacheRoute: false,
+        loopLaneX,
+        kvWriteLaneX,
+        kvWritePortX: kvWriteLaneX,
+        kvReadPortX: kvX + kvWidth * kvReadPortRatio,
+        decodeInX: mainRight - decodeInsetRight,
+        decodeInY: COMPONENTS.sampling.y + COMPONENTS.sampling.height / 2,
         detokenizeY,
         height: detokenizeY + COMPONENTS.detokenize.height + 30
     };
@@ -347,12 +356,6 @@ function renderInnerLoopBoxes(layout) {
         dashed: true
     });
 
-    svg.append('text')
-        .attr('x', loopTurnX + 6)
-        .attr('y', COMPONENTS.logits.y + 4)
-        .attr('fill', '#00d4ff')
-        .attr('font-size', '10px')
-        .text('append token and repeat');
 }
 
 function renderSideCache(layout) {
@@ -362,57 +365,29 @@ function renderSideCache(layout) {
         x: layout.mainX + layout.mainWidth,
         y: COMPONENTS.prefillPhase.y + COMPONENTS.prefillPhase.height * 0.35
     };
-    const kvIn = {
-        x: layout.mode === 'wide' ? layout.kvX : layout.kvX + layout.kvWidth - 18,
-        y: COMPONENTS.kvCache.y + 18
+    const kvWriteIn = {
+        x: layout.kvWritePortX,
+        y: COMPONENTS.kvCache.y
     };
-    const kvOut = {
-        x: layout.mode === 'wide' ? layout.kvX : layout.kvX + layout.kvWidth - 18,
-        y: COMPONENTS.kvCache.y + COMPONENTS.kvCache.height - 18
+    const kvReadOut = {
+        x: layout.kvReadPortX,
+        y: COMPONENTS.kvCache.y + COMPONENTS.kvCache.height
     };
     const decodeIn = {
-        x: layout.mainX + layout.mainWidth,
-        y: COMPONENTS.logits.y + COMPONENTS.logits.height * 0.6
+        x: layout.decodeInX,
+        y: layout.decodeInY
     };
-
-    const mainRight = layout.mainX + layout.mainWidth;
-    const loopBottomOut = {
-        x: mainRight - 14,
-        y: COMPONENTS.autoregressiveLoop.y + COMPONENTS.autoregressiveLoop.height + 2
-    };
-
-    if (layout.mode === 'wide') {
-        drawConnectorPath([
-            prefillOut,
-            { x: layout.kvLaneX, y: prefillOut.y },
-            { x: layout.kvLaneX, y: kvIn.y },
-            kvIn
-        ]);
-
-        if (!layout.simplifiedCacheRoute) {
-            drawConnectorPath([
-                kvOut,
-                { x: layout.kvLaneX, y: kvOut.y },
-                { x: layout.kvLaneX, y: decodeIn.y },
-                decodeIn
-            ]);
-        }
-
-        return;
-    }
 
     drawConnectorPath([
-        loopBottomOut,
-        { x: layout.kvLaneX, y: loopBottomOut.y },
-        { x: layout.kvLaneX, y: kvIn.y },
-        kvIn
+        prefillOut,
+        { x: layout.kvWriteLaneX, y: prefillOut.y },
+        kvWriteIn
     ]);
 
     drawConnectorPath([
-        kvOut,
-        { x: layout.kvLaneX, y: kvOut.y },
-        { x: layout.kvLaneX, y: decodeIn.y },
-        { x: mainRight - 14, y: decodeIn.y }
+        kvReadOut,
+        { x: kvReadOut.x, y: decodeIn.y },
+        decodeIn
     ]);
 }
 
