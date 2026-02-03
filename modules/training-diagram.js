@@ -63,7 +63,7 @@ const COMPONENTS = {
         id: 'sft',
         label: 'Supervised Fine-Tuning (SFT)',
         sublabel: 'Instruction-following adaptation',
-        y: 500,
+        y: 470,
         height: 52,
         color: '#ec4899',
         infoKey: 'sft'
@@ -72,7 +72,7 @@ const COMPONENTS = {
         id: 'preference-tuning',
         label: 'Preference Tuning (DPO/PPO)',
         sublabel: 'Human preference alignment',
-        y: 570,
+        y: 540,
         height: 52,
         color: '#06b6d4',
         infoKey: 'preferenceTuning'
@@ -90,7 +90,6 @@ const MAIN_ARROWS = [
 const DIAGRAM_HEIGHT = 680;
 const BOX_MAX_WIDTH = 460;
 const BOX_SIDE_PADDING = 50;
-const LOOP_LABEL = 'update weights and repeat';
 const LOOP_BOUNDS_PADDING = 8;
 const LOOP_WIDE_MIN_RIGHT_SPACE = 92;
 const LOOP_WIDE_START_OFFSET = 10;
@@ -209,19 +208,12 @@ function getTrainingLayout(width) {
         boxX,
         boxWidth,
         centerX,
-        bounds,
-        mode,
         loop: {
             fromY,
             toY,
             startX,
             laneX,
-            endX,
-            labelX: mode === 'wide'
-                ? clamp(laneX + 8, bounds.minX + 24, bounds.maxX - 4)
-                : clamp(laneX - 4, bounds.minX + 24, bounds.maxX - 4),
-            labelY: (fromY + toY) / 2,
-            labelAnchor: mode === 'wide' ? 'start' : 'end'
+            endX
         }
     };
 }
@@ -298,7 +290,7 @@ function renderArrows(layout) {
 }
 
 function renderLoopArrow(layout) {
-    const { bounds, loop } = layout;
+    const { loop } = layout;
 
     const path = [
         `M ${loop.startX} ${loop.fromY}`,
@@ -315,37 +307,6 @@ function renderLoopArrow(layout) {
         .attr('stroke-dasharray', '6,4')
         .attr('marker-end', 'url(#training-arrow)')
         .attr('opacity', 0.85);
-
-    const loopLabel = svg.append('text')
-        .attr('class', 'diagram-loop-label')
-        .attr('x', loop.labelX)
-        .attr('y', loop.labelY)
-        .attr('text-anchor', loop.labelAnchor)
-        .text(LOOP_LABEL);
-
-    fitTextWithinBounds(loopLabel, bounds);
-}
-
-function fitTextWithinBounds(textSelection, bounds) {
-    const node = textSelection.node();
-    if (!node) return;
-
-    const bbox = node.getBBox();
-    const baseX = Number(textSelection.attr('x'));
-    if (!Number.isFinite(baseX)) return;
-
-    const leftOverflow = bounds.minX - bbox.x;
-    const rightOverflow = (bbox.x + bbox.width) - bounds.maxX;
-
-    let nextX = baseX;
-    if (leftOverflow > 0) {
-        nextX += leftOverflow;
-    }
-    if (rightOverflow > 0) {
-        nextX -= rightOverflow;
-    }
-
-    textSelection.attr('x', nextX);
 }
 
 function renderPostTrainingBranch(layout) {
