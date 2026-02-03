@@ -3,6 +3,8 @@
  * Renders the main transformer architecture diagram
  */
 
+import { clamp, getCenteredBox, getHorizontalBounds } from './diagram-layout-utils.js';
+
 // Component definitions with positions and metadata
 const COMPONENTS = {
     input: {
@@ -117,6 +119,12 @@ const ARROWS = [
     { from: 'outputProjection', to: 'output' }
 ];
 
+const DIAGRAM_HEIGHT = 620;
+const BOX_MAX_WIDTH = 400;
+const BOX_SIDE_PADDING = 40;
+const LAYOUT_BOUNDS_PADDING = 8;
+const CONTAINER_INSET = 15;
+
 let svg = null;
 let currentHighlight = null;
 let moeMode = false;
@@ -136,16 +144,46 @@ export function initDiagram(containerId, clickHandler) {
     if (!container) return;
 
     container.innerHTML = '';
-    const width = container.clientWidth;
-    const height = 620;
+    const width = container.clientWidth || 700;
+    const layout = getArchitectureLayout(width);
 
     // Create SVG with D3
     svg = d3.select(`#${containerId}`)
         .append('svg')
         .attr('width', '100%')
-        .attr('height', height)
-        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('height', DIAGRAM_HEIGHT)
+        .attr('viewBox', `0 0 ${width} ${DIAGRAM_HEIGHT}`)
         .attr('class', 'diagram-svg');
+
+    addDefs();
+    renderDiagram(layout);
+    applyMOEVisualState();
+
+    // Handle resize
+    resizeHandler = () => {
+        const newWidth = container.clientWidth || width;
+        const nextLayout = getArchitectureLayout(newWidth);
+
+        svg.attr('height', DIAGRAM_HEIGHT)
+            .attr('viewBox', `0 0 ${newWidth} ${DIAGRAM_HEIGHT}`);
+
+        svg.selectAll('*').remove();
+        addDefs();
+        renderDiagram(nextLayout);
+        applyMOEVisualState();
+
+        if (currentHighlight && COMPONENTS[currentHighlight]) {
+            const keyToRestore = currentHighlight;
+            currentHighlight = null;
+            highlightComponent(keyToRestore);
+        }
+    };
+
+    window.addEventListener('resize', resizeHandler);
+}
+
+function addDefs() {
+    if (!svg) return;
 
     // Add defs for gradients and filters
     const defs = svg.append('defs');
@@ -178,19 +216,33 @@ export function initDiagram(containerId, clickHandler) {
         .append('path')
         .attr('d', 'M0,-5L10,0L0,5')
         .attr('fill', '#606060');
+}
 
-    // Render components
-    renderComponents(width);
-    renderArrows(width);
-    renderLayerIndicator(width);
+function getArchitectureLayout(width) {
+    const bounds = getHorizontalBounds(width, LAYOUT_BOUNDS_PADDING);
+    const centered = getCenteredBox(width, BOX_MAX_WIDTH, BOX_SIDE_PADDING);
+    const containerRightEdge = centered.rightEdge + CONTAINER_INSET;
+    const labelFitsRight = (bounds.maxX - containerRightEdge) >= 72;
+    const mode = labelFitsRight ? 'wide' : 'narrow';
 
-    // Handle resize
-    resizeHandler = () => {
-        const newWidth = container.clientWidth;
-        svg.attr('viewBox', `0 0 ${newWidth} ${height}`);
+    return {
+        bounds,
+        mode,
+        boxX: centered.boxX,
+        boxWidth: centered.boxWidth,
+        centerX: centered.centerX,
+        containerLabelX: mode === 'wide'
+            ? clamp(containerRightEdge + 8, bounds.minX + 6, bounds.maxX - 6)
+            : clamp(centered.leftEdge + 8, bounds.minX + 6, bounds.maxX - 6),
+        containerLabelY: COMPONENTS.transformerBlock.y + 20,
+        containerLabelAnchor: 'start'
     };
+}
 
-    window.addEventListener('resize', resizeHandler);
+function renderDiagram(layout) {
+    renderComponents(layout);
+    renderArrows(layout);
+    renderLayerIndicator(layout);
 }
 
 export function destroyDiagram() {
@@ -212,15 +264,13 @@ export function destroyDiagram() {
 /**
  * Render all components
  */
-function renderComponents(width) {
-    const boxWidth = Math.min(400, width - 80);
-    const centerX = width / 2;
-    const boxX = centerX - boxWidth / 2;
+function renderComponents(layout) {
+    const { boxX, boxWidth } = layout;
 
     // Create groups for each component
     Object.entries(COMPONENTS).forEach(([key, comp]) => {
         if (comp.isContainer) {
-            renderContainer(comp, boxX, boxWidth);
+            renderContainer(comp, layout);
         } else if (!comp.hidden || key === 'moe') {
             renderBox(key, comp, boxX, boxWidth);
         }
@@ -230,16 +280,17 @@ function renderComponents(width) {
 /**
  * Render a container (transformer block)
  */
-function renderContainer(comp, x, width) {
+function renderContainer(comp, layout) {
+    const { boxX, boxWidth, containerLabelX, containerLabelY, containerLabelAnchor } = layout;
     const group = svg.append('g')
         .attr('class', 'component-container')
         .attr('id', comp.id);
 
     // Container rectangle with dashed border
     group.append('rect')
-        .attr('x', x - 15)
+        .attr('x', boxX - CONTAINER_INSET)
         .attr('y', comp.y)
-        .attr('width', width + 30)
+        .attr('width', boxWidth + CONTAINER_INSET * 2)
         .attr('height', comp.height)
         .attr('rx', 8)
         .attr('fill', 'transparent')
@@ -250,8 +301,9 @@ function renderContainer(comp, x, width) {
 
     // Label
     group.append('text')
-        .attr('x', x + width + 20)
-        .attr('y', comp.y + 20)
+        .attr('x', containerLabelX)
+        .attr('y', containerLabelY)
+        .attr('text-anchor', containerLabelAnchor)
         .attr('class', 'container-label')
         .attr('fill', comp.color)
         .attr('font-size', '12px')
@@ -355,9 +407,8 @@ function renderBox(key, comp, x, width) {
 /**
  * Render arrows between components
  */
-function renderArrows(width) {
-    const boxWidth = Math.min(400, width - 80);
-    const centerX = width / 2;
+function renderArrows(layout) {
+    const { centerX } = layout;
 
     ARROWS.forEach(arrow => {
         const fromComp = COMPONENTS[arrow.from];
@@ -384,9 +435,8 @@ function renderArrows(width) {
 /**
  * Render layer stacking indicator
  */
-function renderLayerIndicator(width) {
-    const centerX = width / 2;
-    const boxWidth = Math.min(400, width - 80);
+function renderLayerIndicator(layout) {
+    const { centerX, boxWidth } = layout;
 
     // Stacked layers visual
     for (let i = 1; i <= 2; i++) {
@@ -503,31 +553,39 @@ export function clearHighlight() {
  */
 export function toggleMOE() {
     moeMode = !moeMode;
+    applyMOEVisualState({ animate: true });
+}
+
+function applyMOEVisualState({ animate = false } = {}) {
+    if (!svg) return;
 
     const ffnGroup = svg.select('#ffn-block');
     const moeGroup = svg.select('#moe-block');
+    if (ffnGroup.empty() || moeGroup.empty()) return;
+
+    const duration = animate ? 300 : 0;
 
     if (moeMode) {
         ffnGroup.classed('hidden', true)
             .transition()
-            .duration(300)
+            .duration(duration)
             .attr('opacity', 0);
 
         moeGroup.classed('hidden', false)
             .attr('opacity', 0)
             .transition()
-            .duration(300)
+            .duration(duration)
             .attr('opacity', 1);
     } else {
         moeGroup.classed('hidden', true)
             .transition()
-            .duration(300)
+            .duration(duration)
             .attr('opacity', 0);
 
         ffnGroup.classed('hidden', false)
             .attr('opacity', 0)
             .transition()
-            .duration(300)
+            .duration(duration)
             .attr('opacity', 1);
     }
 

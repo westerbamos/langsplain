@@ -1533,6 +1533,12 @@ button {
     pointer-events: none;
 }
 
+.diagram-loop-label {
+    fill: var(--accent-cyan);
+    font-size: 11px;
+    pointer-events: none;
+}
+
 /* Token flow animation */
 .flowing-token rect {
     filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.5));

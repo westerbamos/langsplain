@@ -2,6 +2,8 @@
  * Inference pipeline diagram rendering and interactions using D3.js
  */
 
+import { clamp, getCenteredBox, getHorizontalBounds } from './diagram-layout-utils.js';
+
 const COMPONENTS = {
     inputPrompt: {
         id: 'input-prompt',
@@ -188,6 +190,7 @@ function addDefs(svgEl) {
 }
 
 function getInferenceLayout(width) {
+    const bounds = getHorizontalBounds(width, 8);
     const sidePadding = 20;
     const laneGap = 36;
     const laneInset = 8;
@@ -197,18 +200,19 @@ function getInferenceLayout(width) {
     const kvReadPortRatio = 0.5;
     const kvMinWidth = 150;
     const kvMaxWidth = COMPONENTS.kvCache.width;
-    const kvWidth = Math.max(kvMinWidth, Math.min(kvMaxWidth, width - 40));
+    const kvWidth = clamp(width - 40, kvMinWidth, kvMaxWidth);
 
     const wideMainWidth = Math.min(430, width - sidePadding * 2 - kvWidth - laneGap);
 
     if (wideMainWidth >= 320) {
         const totalWidth = wideMainWidth + laneGap + kvWidth;
-        const mainX = Math.max(12, (width - totalWidth) / 2);
+        const laneLayout = getCenteredBox(width, totalWidth, sidePadding);
+        const mainX = laneLayout.leftEdge;
         const mainRight = mainX + wideMainWidth;
-        const kvX = mainRight + laneGap;
-        const loopLaneX = mainRight + laneInset;
-        const kvWritePortX = kvX + kvWidth * kvWritePortRatioWide;
-        const kvWriteLaneX = kvWritePortX;
+        const kvX = clamp(mainRight + laneGap, bounds.minX + 4, bounds.maxX - kvWidth);
+        const loopLaneX = clamp(mainRight + laneInset, mainRight + 4, bounds.maxX - 2);
+        const kvWritePortX = clamp(kvX + kvWidth * kvWritePortRatioWide, kvX + 2, kvX + kvWidth - 2);
+        const kvWriteLaneX = clamp(kvWritePortX, mainRight + 4, bounds.maxX - 2);
 
         return {
             mode: 'wide',
@@ -220,22 +224,23 @@ function getInferenceLayout(width) {
             loopLaneX,
             kvWriteLaneX,
             kvWritePortX,
-            kvReadPortX: kvX + kvWidth * kvReadPortRatio,
-            decodeInX: mainRight - decodeInsetRight,
+            kvReadPortX: clamp(kvX + kvWidth * kvReadPortRatio, kvX + 2, kvX + kvWidth - 2),
+            decodeInX: clamp(mainRight - decodeInsetRight, bounds.minX + 20, bounds.maxX - 20),
             decodeInY: COMPONENTS.sampling.y + COMPONENTS.sampling.height / 2,
             detokenizeY: BASE_LAYOUT.detokenizeY,
             height: BASE_LAYOUT.height
         };
     }
 
-    const mainWidth = Math.min(460, width - 48);
-    const mainX = (width - mainWidth) / 2;
+    const narrowMain = getCenteredBox(width, 460, 24);
+    const mainWidth = narrowMain.boxWidth;
+    const mainX = narrowMain.boxX;
     const mainRight = mainX + mainWidth;
     const kvY = COMPONENTS.autoregressiveLoop.y + COMPONENTS.autoregressiveLoop.height + 10;
-    const kvX = Math.max(12, width - kvWidth - 20);
+    const kvX = clamp(width - kvWidth - 20, bounds.minX + 4, bounds.maxX - kvWidth);
     const detokenizeY = kvY + COMPONENTS.kvCache.height + 26;
-    const loopLaneX = Math.min(width - 24, mainRight + laneInset + 2);
-    const kvWriteLaneX = Math.min(width - 8, kvX + kvWidth - kvWritePortInsetNarrow);
+    const loopLaneX = clamp(mainRight + laneInset + 2, mainRight + 4, bounds.maxX - 2);
+    const kvWriteLaneX = clamp(kvX + kvWidth - kvWritePortInsetNarrow, mainRight + 8, bounds.maxX - 2);
 
     return {
         mode: 'narrow',
@@ -246,9 +251,9 @@ function getInferenceLayout(width) {
         kvWidth,
         loopLaneX,
         kvWriteLaneX,
-        kvWritePortX: kvWriteLaneX,
-        kvReadPortX: kvX + kvWidth * kvReadPortRatio,
-        decodeInX: mainRight - decodeInsetRight,
+        kvWritePortX: clamp(kvWriteLaneX, kvX + 2, kvX + kvWidth - 2),
+        kvReadPortX: clamp(kvX + kvWidth * kvReadPortRatio, kvX + 2, kvX + kvWidth - 2),
+        decodeInX: clamp(mainRight - decodeInsetRight, bounds.minX + 20, bounds.maxX - 20),
         decodeInY: COMPONENTS.sampling.y + COMPONENTS.sampling.height / 2,
         detokenizeY,
         height: detokenizeY + COMPONENTS.detokenize.height + 30

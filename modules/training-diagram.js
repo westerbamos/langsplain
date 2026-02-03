@@ -2,6 +2,8 @@
  * Training pipeline diagram rendering and interactions using D3.js
  */
 
+import { clamp, getCenteredBox, getHorizontalBounds } from './diagram-layout-utils.js';
+
 const COMPONENTS = {
     trainingData: {
         id: 'training-data',
@@ -85,6 +87,17 @@ const MAIN_ARROWS = [
     { from: 'backpropagation', to: 'optimizer' }
 ];
 
+const DIAGRAM_HEIGHT = 680;
+const BOX_MAX_WIDTH = 460;
+const BOX_SIDE_PADDING = 50;
+const LOOP_LABEL = 'update weights and repeat';
+const LOOP_BOUNDS_PADDING = 8;
+const LOOP_WIDE_MIN_RIGHT_SPACE = 92;
+const LOOP_WIDE_START_OFFSET = 10;
+const LOOP_WIDE_LANE_OFFSET = 58;
+const LOOP_NARROW_START_OFFSET = 6;
+const LOOP_NARROW_LANE_OFFSET = 24;
+
 let svg = null;
 let currentHighlight = null;
 let onComponentClick = null;
@@ -101,24 +114,34 @@ export function initDiagram(containerId, clickHandler) {
     container.innerHTML = '';
 
     const width = container.clientWidth || 700;
-    const height = 680;
+    const layout = getTrainingLayout(width);
 
     svg = d3.select(container)
         .append('svg')
         .attr('width', '100%')
-        .attr('height', height)
-        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('height', DIAGRAM_HEIGHT)
+        .attr('viewBox', `0 0 ${width} ${DIAGRAM_HEIGHT}`)
         .attr('class', 'diagram-svg');
 
     addDefs(svg);
-    renderComponents(width);
-    renderArrows(width);
-    renderLoopArrow(width);
-    renderPostTrainingBranch(width);
+    renderDiagram(layout);
 
     resizeHandler = () => {
         const newWidth = container.clientWidth || width;
-        svg.attr('viewBox', `0 0 ${newWidth} ${height}`);
+        const nextLayout = getTrainingLayout(newWidth);
+
+        svg.attr('height', DIAGRAM_HEIGHT)
+            .attr('viewBox', `0 0 ${newWidth} ${DIAGRAM_HEIGHT}`);
+
+        svg.selectAll('*').remove();
+        addDefs(svg);
+        renderDiagram(nextLayout);
+
+        if (currentHighlight && COMPONENTS[currentHighlight]) {
+            const keyToRestore = currentHighlight;
+            currentHighlight = null;
+            highlightComponent(keyToRestore);
+        }
     };
 
     window.addEventListener('resize', resizeHandler);
@@ -169,9 +192,49 @@ function addDefs(svgEl) {
         .attr('fill', '#606060');
 }
 
-function renderComponents(width) {
-    const boxWidth = Math.min(460, width - 100);
-    const boxX = width / 2 - boxWidth / 2;
+function getTrainingLayout(width) {
+    const bounds = getHorizontalBounds(width, LOOP_BOUNDS_PADDING);
+    const { boxX, boxWidth, centerX, rightEdge } = getCenteredBox(width, BOX_MAX_WIDTH, BOX_SIDE_PADDING);
+    const fromY = COMPONENTS.optimizer.y + COMPONENTS.optimizer.height / 2;
+    const toY = COMPONENTS.forwardPass.y + COMPONENTS.forwardPass.height / 2;
+    const availableRight = bounds.maxX - rightEdge;
+    const mode = availableRight >= LOOP_WIDE_MIN_RIGHT_SPACE ? 'wide' : 'narrow';
+    const startOffset = mode === 'wide' ? LOOP_WIDE_START_OFFSET : LOOP_NARROW_START_OFFSET;
+    const laneOffset = mode === 'wide' ? LOOP_WIDE_LANE_OFFSET : LOOP_NARROW_LANE_OFFSET;
+    const laneX = clamp(rightEdge + laneOffset, bounds.minX + 24, bounds.maxX);
+    const startX = clamp(rightEdge + startOffset, bounds.minX + 20, laneX - 6);
+    const endX = clamp(rightEdge + LOOP_WIDE_START_OFFSET, bounds.minX + 20, laneX - 6);
+
+    return {
+        boxX,
+        boxWidth,
+        centerX,
+        bounds,
+        mode,
+        loop: {
+            fromY,
+            toY,
+            startX,
+            laneX,
+            endX,
+            labelX: mode === 'wide'
+                ? clamp(laneX + 8, bounds.minX + 24, bounds.maxX - 4)
+                : clamp(laneX - 4, bounds.minX + 24, bounds.maxX - 4),
+            labelY: (fromY + toY) / 2,
+            labelAnchor: mode === 'wide' ? 'start' : 'end'
+        }
+    };
+}
+
+function renderDiagram(layout) {
+    renderComponents(layout);
+    renderArrows(layout);
+    renderLoopArrow(layout);
+    renderPostTrainingBranch(layout);
+}
+
+function renderComponents(layout) {
+    const { boxX, boxWidth, centerX } = layout;
 
     Object.entries(COMPONENTS).forEach(([key, comp]) => {
         const group = svg.append('g')
@@ -196,7 +259,7 @@ function renderComponents(width) {
 
         group.append('text')
             .attr('class', 'box-label')
-            .attr('x', width / 2)
+            .attr('x', centerX)
             .attr('y', comp.y + comp.height / 2 - 6)
             .attr('text-anchor', 'middle')
             .attr('fill', '#f0f0f0')
@@ -206,7 +269,7 @@ function renderComponents(width) {
 
         group.append('text')
             .attr('class', 'box-sublabel')
-            .attr('x', width / 2)
+            .attr('x', centerX)
             .attr('y', comp.y + comp.height / 2 + 12)
             .attr('text-anchor', 'middle')
             .attr('fill', '#a0a0a0')
@@ -215,8 +278,8 @@ function renderComponents(width) {
     });
 }
 
-function renderArrows(width) {
-    const centerX = width / 2;
+function renderArrows(layout) {
+    const { centerX } = layout;
 
     MAIN_ARROWS.forEach((arrow) => {
         const fromComp = COMPONENTS[arrow.from];
@@ -234,17 +297,14 @@ function renderArrows(width) {
     });
 }
 
-function renderLoopArrow(width) {
-    const boxWidth = Math.min(460, width - 100);
-    const rightEdge = width / 2 + boxWidth / 2;
-    const from = COMPONENTS.optimizer;
-    const to = COMPONENTS.forwardPass;
+function renderLoopArrow(layout) {
+    const { bounds, loop } = layout;
 
     const path = [
-        `M ${rightEdge + 10} ${from.y + from.height / 2}`,
-        `L ${rightEdge + 58} ${from.y + from.height / 2}`,
-        `L ${rightEdge + 58} ${to.y + to.height / 2}`,
-        `L ${rightEdge + 10} ${to.y + to.height / 2}`
+        `M ${loop.startX} ${loop.fromY}`,
+        `L ${loop.laneX} ${loop.fromY}`,
+        `L ${loop.laneX} ${loop.toY}`,
+        `L ${loop.endX} ${loop.toY}`
     ].join(' ');
 
     svg.append('path')
@@ -256,16 +316,40 @@ function renderLoopArrow(width) {
         .attr('marker-end', 'url(#training-arrow)')
         .attr('opacity', 0.85);
 
-    svg.append('text')
-        .attr('x', rightEdge + 66)
-        .attr('y', (from.y + to.y) / 2)
-        .attr('fill', '#00d4ff')
-        .attr('font-size', '11px')
-        .text('update weights and repeat');
+    const loopLabel = svg.append('text')
+        .attr('class', 'diagram-loop-label')
+        .attr('x', loop.labelX)
+        .attr('y', loop.labelY)
+        .attr('text-anchor', loop.labelAnchor)
+        .text(LOOP_LABEL);
+
+    fitTextWithinBounds(loopLabel, bounds);
 }
 
-function renderPostTrainingBranch(width) {
-    const centerX = width / 2;
+function fitTextWithinBounds(textSelection, bounds) {
+    const node = textSelection.node();
+    if (!node) return;
+
+    const bbox = node.getBBox();
+    const baseX = Number(textSelection.attr('x'));
+    if (!Number.isFinite(baseX)) return;
+
+    const leftOverflow = bounds.minX - bbox.x;
+    const rightOverflow = (bbox.x + bbox.width) - bounds.maxX;
+
+    let nextX = baseX;
+    if (leftOverflow > 0) {
+        nextX += leftOverflow;
+    }
+    if (rightOverflow > 0) {
+        nextX -= rightOverflow;
+    }
+
+    textSelection.attr('x', nextX);
+}
+
+function renderPostTrainingBranch(layout) {
+    const { centerX } = layout;
 
     svg.append('line')
         .attr('x1', centerX)
