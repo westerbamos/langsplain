@@ -331,6 +331,9 @@ const GLOSSARY = [
     { term: 'Transformer Block', definition: 'Core repeated unit: attention + FFN (+ residual/normalization structure).' }
 ];
 
+const MOBILE_BREAKPOINT = 768;
+const PANEL_COLLISION_GAP = 12;
+
 let currentView = 'home';
 let currentSection = 'architecture';
 let infoPanelOpen = false;
@@ -484,6 +487,30 @@ function handleComponentClick(infoKey) {
     }
 }
 
+function syncDiagramPanelOffset() {
+    const diagramSection = document.querySelector('.diagram-section');
+    if (!diagramSection) return;
+
+    if (!infoPanelOpen || window.innerWidth <= MOBILE_BREAKPOINT) {
+        diagramSection.classList.remove('panel-open');
+        return;
+    }
+
+    const diagramContainer = document.getElementById('diagram-container');
+    const panel = document.getElementById('info-panel');
+    if (!diagramContainer || !panel) {
+        diagramSection.classList.remove('panel-open');
+        return;
+    }
+
+    const { right: diagramRight } = diagramContainer.getBoundingClientRect();
+    const panelWidth = panel.offsetWidth;
+    const panelLeft = window.innerWidth - panelWidth;
+    const shouldOffsetDiagram = diagramRight + PANEL_COLLISION_GAP > panelLeft;
+
+    diagramSection.classList.toggle('panel-open', shouldOffsetDiagram);
+}
+
 function openInfoPanel(infoKey) {
     const content = SECTION_CONFIG[currentSection].infoContent[infoKey];
     if (!content) return;
@@ -497,7 +524,7 @@ function openInfoPanel(infoKey) {
     infoPanelOpen = true;
 
     panel.classList.add('open');
-    document.querySelector('.diagram-section').classList.add('panel-open');
+    syncDiagramPanelOffset();
 
     highlightForInfoKey(infoKey);
 
@@ -775,9 +802,12 @@ function setupGlossary() {
 }
 
 function handleResize() {
-    if (window.innerWidth < 768 && infoPanelOpen) {
-        document.querySelector('.diagram-section').classList.remove('panel-open');
+    if (infoPanelOpen) {
+        syncDiagramPanelOffset();
+        return;
     }
+
+    document.querySelector('.diagram-section')?.classList.remove('panel-open');
 }
 
 document.addEventListener('DOMContentLoaded', init);
