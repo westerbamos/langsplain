@@ -269,7 +269,7 @@ const INFERENCE_INFO_CONTENT = {
     stopCondition: {
         title: 'Stop Conditions',
         simple: `
-            <p>Generation ends when EOS appears, a stop sequence matches, or max tokens are reached.</p>
+            <p>Generation ends when EOS (end of sequence token) appears, a stop sequence matches, or max tokens are reached.</p>
         `,
         technical: `
             <p>Serving stacks often apply custom business stop criteria on top of core model EOS logic.</p>
