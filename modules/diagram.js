@@ -436,22 +436,7 @@ function renderArrows(layout) {
  * Render layer stacking indicator
  */
 function renderLayerIndicator(layout) {
-    const { centerX, boxWidth } = layout;
-
-    // Stacked layers visual
-    for (let i = 1; i <= 2; i++) {
-        svg.append('rect')
-            .attr('x', centerX - boxWidth / 2 - 15 + i * 5)
-            .attr('y', COMPONENTS.transformerBlock.y + COMPONENTS.transformerBlock.height + i * 5)
-            .attr('width', boxWidth + 30 - i * 10)
-            .attr('height', 20)
-            .attr('rx', 4)
-            .attr('fill', 'transparent')
-            .attr('stroke', '#00d4ff')
-            .attr('stroke-width', 1)
-            .attr('stroke-dasharray', '4,4')
-            .attr('opacity', 0.2);
-    }
+    const { centerX } = layout;
 
     // "... more layers ..." text
     svg.append('text')
