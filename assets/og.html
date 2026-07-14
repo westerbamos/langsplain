@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: oklch(0.97 0.008 85);
+    --ink: oklch(0.24 0.015 75);
+    --ink-soft: oklch(0.45 0.015 75);
+    --coral: oklch(0.66 0.19 25);
+    --cobalt-tint: oklch(0.93 0.035 262);
+    --mint-tint: oklch(0.94 0.04 165);
+    --marigold: oklch(0.8 0.16 80);
+  }
+  * { margin: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 630px;
+    background: var(--paper);
+    font-family: "Bricolage Grotesque", sans-serif;
+    color: var(--ink);
+    padding: 64px 72px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    overflow: hidden;
+  }
+  .brand { font-weight: 800; font-size: 34px; letter-spacing: -0.01em; }
+  .brand .dot { color: var(--coral); }
+  h1 {
+    font-size: 88px; font-weight: 800; line-height: 1.02;
+    letter-spacing: -0.02em; max-width: 15ch;
+  }
+  .chips { display: flex; gap: 14px; align-items: center; }
+  .token {
+    font-family: "Spline Sans Mono", monospace;
+    font-size: 30px;
+    padding: 10px 20px;
+    border: 3px solid var(--ink);
+    border-radius: 14px;
+    background: var(--cobalt-tint);
+  }
+  .token.out { background: var(--mint-tint); }
+  .token.active { background: var(--marigold); box-shadow: 0 5px 0 var(--ink); }
+  .cursor { font-family: "Spline Sans Mono", monospace; font-size: 34px; color: var(--ink-soft); }
+  .tag { font-family: "Spline Sans Mono", monospace; font-size: 24px; color: var(--ink-soft); }
+  .row { display: flex; justify-content: space-between; align-items: flex-end; }
+</style>
+</head>
+<body>
+  <div class="brand">langsplain<span class="dot">.</span></div>
+  <h1>How does a machine finish your sentence?</h1>
+  <div class="row">
+    <div class="chips">
+      <span class="token">The</span>
+      <span class="token">cat</span>
+      <span class="token">sat</span>
+      <span class="token">on</span>
+      <span class="token">the</span>
+      <span class="token out">mat</span>
+      <span class="token active">?</span>
+    </div>
+    <div class="tag">nine playable chapters</div>
+  </div>
+</body>
+</html>
