@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layers · Langsplain</title>
+<meta name="description" content="Play with a single neuron, then stack twelve layers of them and watch a word's meaning deepen.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* Page-specific styling for the layers chapter */
+  :root {
+    --pipe-min: 3px;
+    --tag-form: var(--cobalt-tint);
+    --tag-form-ink: var(--cobalt-deep);
+    --tag-structure: var(--coral-tint);
+    --tag-structure-ink: var(--coral-deep);
+    --tag-meaning: var(--marigold-tint);
+    --tag-meaning-ink: var(--marigold-deep);
+    --tag-predict: var(--mint-tint);
+    --tag-predict-ink: var(--mint-deep);
+  }
+
+  .neuron-svg { display: block; width: 100%; height: auto; }
+  .neuron-svg text { font-family: var(--font-mono); }
+
+  .neuron-readouts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+  }
+  .neuron-readouts .ro { display: inline-flex; align-items: baseline; gap: 0.45em; }
+  .neuron-readouts .ro b { font-weight: 600; color: var(--ink-soft); font-size: 0.8rem; }
+  .neuron-readouts .ro output { min-width: 4.5ch; font-weight: 600; }
+  .neuron-readouts .ro.is-open output { color: var(--mint-deep); }
+  .neuron-readouts .ro.is-closed output { color: var(--coral-deep); }
+
+  /* Stacking demo */
+  .stack-wrap {
+    display: flex;
+    gap: clamp(1.25rem, 4vw, 2.5rem);
+    align-items: stretch;
+    margin-top: 1.5rem;
+  }
+  .layer-tower {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 4px;
+    flex: 0 0 auto;
+    width: clamp(72px, 12vw, 110px);
+  }
+  .layer-tower .block {
+    flex: 1;
+    min-height: 18px;
+    border: 2px solid var(--ink);
+    border-radius: 7px;
+    background: var(--paper);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--ink-faint);
+    transition: background var(--t-med) var(--ease-out), color var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out);
+  }
+  .layer-tower .block.done { background: var(--coral-tint); color: var(--coral-deep); }
+  .layer-tower .block.here {
+    background: var(--marigold);
+    color: var(--ink);
+    font-weight: 600;
+    transform: translateX(6px);
+  }
+
+  .knows { flex: 1 1 0; min-width: 0; }
+  .knows-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    margin-bottom: 0.65rem;
+  }
+  .knows-title .mono { color: var(--marigold-deep); }
+
+  .tag-stack { display: flex; flex-direction: column; gap: 0.45rem; align-items: flex-start; }
+  .tag {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.55em;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0.28rem 0.7rem;
+    border: 2px solid var(--ink);
+    border-radius: var(--r-chip);
+    background: var(--paper);
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+    transition: opacity var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out);
+    max-width: 100%;
+  }
+  .tag .lyr {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    opacity: 0.75;
+    flex: none;
+  }
+  .tag.on { opacity: 1; transform: translateY(0) scale(1); }
+  .tag.fresh { transform: translateY(0) scale(1.03); }
+  .tag[data-phase="form"]      { background: var(--tag-form);      color: var(--tag-form-ink); }
+  .tag[data-phase="structure"] { background: var(--tag-structure); color: var(--tag-structure-ink); }
+  .tag[data-phase="meaning"]   { background: var(--tag-meaning);   color: var(--tag-meaning-ink); }
+  .tag[data-phase="predict"]   { background: var(--tag-predict);   color: var(--tag-predict-ink); }
+
+  .stack-controls { margin-top: 1.75rem; }
+  .stack-controls .knob { max-width: 420px; }
+
+  @media (max-width: 560px) {
+    .stack-wrap { flex-direction: column; }
+    .layer-tower {
+      flex-direction: row;
+      width: 100%;
+      height: 34px;
+    }
+    .layer-tower .block.here { transform: translateY(-5px); }
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>04</b> / layers</p>
+    <h1>Tiny detectors, stacked deep</h1>
+    <p class="lede">Attention lets words talk to each other. Then each word goes off and thinks alone, using millions of tiny yes-or-no machines. Here is one of them.</p>
+  </header>
+
+  <!-- ============ Hero demo: one neuron as a machine ============ -->
+  <section class="section" aria-labelledby="demo1-title">
+    <div class="prose">
+      <h2 id="demo1-title">One neuron, three pipes, one valve</h2>
+      <p>A neuron is a detector for one specific pattern. This one asks: <em>is this word the end of a question?</em> It watches three clues, weighs each through a pipe, pools the evidence in a tank, and only lets a signal out if the total clears the valve. Fat pipes mean strong opinions; the dashed pipe pulls the level <strong>down</strong>. Drag the sliders and watch the plumbing do the math.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">one neuron · drag the sliders</span>
+        <button class="btn small" id="neuron-reset">reset</button>
+      </div>
+      <div class="stage-body" id="neuron-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Try maxing out <em>inside a quotation</em>: even a clear question mark can be someone else being quoted, so the neuron shuts the valve.</p>
+  </section>
+
+  <!-- ============ Prose: attention talks, the MLP thinks ============ -->
+  <section class="section" aria-labelledby="mlp-title">
+    <div class="prose">
+      <h2 id="mlp-title">Where a word thinks alone</h2>
+      <p>Last chapter, attention let every word gather context from its neighbours. What follows is the opposite kind of step: each word retreats into a private workshop and processes what it collected, no peeking at the others. That workshop is called the <strong>MLP</strong>, and it is nothing more than a wall of detectors like the one above, all reading the same word at once.</p>
+      <p>Except "wall" undersells it. A single layer of a real model runs <strong>tens of thousands of these neurons per word</strong>, each with its own hand-of-cards of weights, each hunting a different pattern: one fires on legal jargon, one on the smell of sarcasm, one on "this sentence is about to end". Nobody chose those patterns. They were learned, and most defy tidy labels.</p>
+      <p>The valve matters more than it looks. Without it, stacking detectors would just be one big averaging machine. Because each neuron can stay <em>silent</em> until its evidence clears the bar, the layer as a whole can make sharp, conditional decisions: this AND that, but NOT while the other thing.</p>
+    </div>
+  </section>
+
+  <!-- ============ Second demo: stacking ============ -->
+  <section class="section" aria-labelledby="demo2-title">
+    <div class="prose">
+      <h2 id="demo2-title">Now stack it</h2>
+      <p>One layer of talk-then-think buys you a little understanding. The trick is repetition: feed the output of one layer into the next, and each round works on the conclusions of the round before. Slide through the stack and watch what one word "knows" pile up.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">a word's journey through 12 layers</span>
+        <button class="btn small" id="stack-reset">reset</button>
+      </div>
+      <div class="stage-body" id="stack-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Scrub the slider both ways: early layers see spelling and grammar, middle layers work out who did what, late layers lean toward what comes next.</p>
+    <p class="hint">The labels are illustrative, in the spirit of what probing research finds when it eavesdrops on real layers; nobody writes them by hand inside an actual model.</p>
+  </section>
+
+  <!-- ============ Prose: depth = abstraction ============ -->
+  <section class="section" aria-labelledby="depth-title">
+    <div class="prose">
+      <h2 id="depth-title">Depth is abstraction</h2>
+      <p>Notice what the slider was really showing: each layer's detectors get to fire on the <em>conclusions</em> of the layer below. A layer-one neuron can only spot surface stuff, endings, capital letters, familiar chunks. A layer-six neuron gets "past tense verb" and "the subject was chef" as raw ingredients, so it can afford to detect grander things, like <em>an apology is happening</em>. Height in the stack buys altitude of thought.</p>
+      <p>That is the entire recipe, by the way. One block of <strong>attention</strong> (words talk) plus one block of <strong>MLP</strong> (each word thinks alone), repeated a few dozen times. No hidden extra machinery, no module labelled "understanding". A frontier model is this page's two demos, photocopied deep and trained on most of the internet.</p>
+      <p>What comes out of the top of the stack is one richly annotated vector per word. Next chapter: how the model turns the final word's vector into an actual guess about what to say.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../attention/"><span class="dir">← previous</span>Attention</a>
+    <a class="next" href="../prediction/"><span class="dir">next →</span>Prediction &amp; sampling</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/layers.js"></script>
+</body>
+</html>

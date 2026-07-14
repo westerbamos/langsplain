@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tokens · Langsplain</title>
+<meta name="description" content="Play with a toy tokenizer: watch letters fuse into tokens, and find out why strawberry sometimes splits in strange places.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* page-specific: tokenizer demo bits */
+  .input-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .tok-input {
+    flex: 1 1 16rem; min-width: 0;
+    font-family: var(--font-mono); font-size: 0.95rem;
+    color: var(--ink);
+    padding: 0.5rem 0.9rem;
+    border: var(--border-toy); border-radius: var(--r-chip);
+    background: var(--paper);
+  }
+  .demo-gap { margin-top: 1.4rem; }
+  .token .sp { color: var(--ink-faint); }
+  .token.fresh { background: var(--marigold); box-shadow: 0 3px 0 var(--ink); }
+  .merge-log {
+    font-family: var(--font-mono); font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-top: 1.1rem; min-height: 1.5em;
+  }
+  .count-readout {
+    font-family: var(--font-mono); font-size: 0.82rem;
+    color: var(--ink-soft); white-space: nowrap;
+  }
+  .count-readout b { color: var(--mint-deep); font-weight: 600; }
+  .preset-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .preset-row .btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .btn:disabled {
+    opacity: 0.4; cursor: default;
+    transform: none; box-shadow: none; background: var(--paper);
+    color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>01</b> / tokens</p>
+    <h1>Chopping language into pieces</h1>
+    <p class="lede">A model never sees your words. It sees tokens: little chunks of text snapped together from letters. This is the machine that does the chopping.</p>
+  </header>
+
+  <!-- ============ Hero demo: the toy tokenizer ============ -->
+  <section class="section" aria-labelledby="demo1-title">
+    <div class="prose">
+      <h2 id="demo1-title">Watch a sentence become tokens</h2>
+      <p>The tokenizer starts with the dumbest possible reading: one chip per character. Then it consults a rulebook of glue rules, learned in advance by counting which pairs of pieces show up together most often, and applies them greedily: best rule first, until nothing else sticks. Press play.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">toy BPE tokenizer</span>
+        <span class="count-readout" id="hero-count" aria-live="polite"></span>
+      </div>
+      <div class="stage-body">
+        <form class="input-row" id="hero-form">
+          <input class="tok-input" id="hero-text" value="The unstoppable strawberry ran unhappily"
+                 maxlength="90" aria-label="Text to tokenize" autocomplete="off" spellcheck="false">
+          <button class="btn" type="submit">chop it</button>
+        </form>
+        <div class="token-row demo-gap" id="hero-row" role="group" aria-label="Current tokens"></div>
+        <div class="controls-row">
+          <button class="btn primary" id="hero-play" aria-pressed="false">play</button>
+          <button class="btn" id="hero-step">step</button>
+          <button class="btn" id="hero-reset">start over</button>
+        </div>
+        <p class="merge-log" id="hero-log" aria-live="polite"></p>
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Type your own sentence and chop it. The ␣ mark is a space: spaces belong to tokens too, which is why “␣straw” and “Straw” are different chips.</p>
+  </section>
+
+  <!-- ============ Why chop at all ============ -->
+  <section class="section" aria-labelledby="why-title">
+    <div class="prose">
+      <h2 id="why-title">Why not whole words? Why not letters?</h2>
+      <p>The obvious plan is a dictionary: one entry per word. It collapses fast. English has hundreds of thousands of words before you count names, slang, hashtags and typos, and the model would go blank the first time you wrote <em>unstoppableness</em>. Every misspelling would be a total stranger.</p>
+      <p>The opposite plan, one letter at a time, always works and is always terrible. A single <em>e</em> means nothing on its own, and a page of text becomes thousands of tiny steps, so the model spends its whole life spelling instead of thinking.</p>
+      <p>Tokens are the learned compromise. Before training, an algorithm called <strong>byte pair encoding</strong> reads a mountain of text and plays one move on repeat: find the two neighbouring pieces that appear together most often, glue them into one, add the glued piece to the vocabulary. Play that move tens of thousands of times and frequency does the design work for you: <em>the</em> earns its own chip, <em>quokka</em> never does.</p>
+      <p>One practical footnote: this is the unit you pay in. When an AI service bills “per token”, it is counting exactly these chips, so wordy prompts literally cost more.</p>
+    </div>
+  </section>
+
+  <!-- ============ Weird splits ============ -->
+  <section class="section" aria-labelledby="demo2-title">
+    <div class="prose">
+      <h2 id="demo2-title">Why weird splits happen</h2>
+      <p>Because the rulebook was learned from frequency, not from grammar, it has blind spots you can poke. Rare words shatter. Digits stay loose. Other languages get chopped against the grain. Pick a specimen:</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">weird splits · pick a specimen</span>
+        <span class="count-readout" id="odd-count"></span>
+      </div>
+      <div class="stage-body">
+        <div class="preset-row" role="group" aria-label="Example texts" id="odd-presets"></div>
+        <div class="token-row demo-gap" id="odd-row" role="group" aria-label="Tokenization result"></div>
+        <p class="hint" id="odd-note" aria-live="polite"></p>
+      </div>
+    </div>
+    <p class="hint">This toy knows 67 merge rules; a real tokenizer learns around a hundred thousand, so its chips are bigger. The blind spots are exactly the same kind.</p>
+  </section>
+
+  <!-- ============ Handoff to embeddings ============ -->
+  <section class="section" aria-labelledby="next-title">
+    <div class="prose">
+      <h2 id="next-title">From chips to numbers</h2>
+      <p>One last sleight of hand: once the text is chopped, each token trades its letters for an ID number in the vocabulary. “The” might be token 464; “␣straw” might be 15721. From here on, the model never touches letters again, only these numbers. So how does a bare number come to <em>mean</em> anything? That is the next chapter.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../"><span class="dir">← previous</span>Home</a>
+    <a class="next" href="../embeddings/"><span class="dir">next →</span>Meaning as a map</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/tokens.js"></script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prediction · Langsplain</title>
+<meta name="description" content="Play with temperature and top-p: load the dice a language model rolls to pick its next word.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* Page-local styles for the prediction chapter */
+  #hero-demo, #preset-demo { --bar-h: 16px; --word-col: 6.5rem; }
+
+  .sentence { min-height: 2.6rem; margin-bottom: 0.4rem; }
+
+  .prob-list { display: grid; gap: 0.45rem; margin-top: 1.5rem; max-width: 34rem; }
+  .prob-row {
+    display: grid;
+    grid-template-columns: var(--word-col) 1fr 3.6rem;
+    gap: 0.7rem;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    transition: opacity var(--t-med) var(--ease-out);
+  }
+  .prob-row .word { justify-self: start; padding: 0 0.3em; border-radius: 6px; }
+  .prob-row .bar {
+    height: var(--bar-h);
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--paper-deep);
+  }
+  .prob-row .fill {
+    height: 100%;
+    background: var(--coral);
+    width: 0%;
+    transition: width var(--t-med) var(--ease-out), background var(--t-med) var(--ease-out);
+  }
+  .prob-row .pct { color: var(--ink-soft); font-size: 0.8rem; text-align: right; }
+  .prob-row.cut { opacity: 0.32; }
+  .prob-row.cut .fill { background: var(--line); }
+  .prob-row.cut .word { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  .prob-row.landed .word { background: var(--marigold); box-shadow: 0 0 0 2px var(--ink); }
+  .prob-row.landed .fill { background: var(--marigold); }
+
+  .roll-controls { display: flex; flex-wrap: wrap; gap: 1.25rem 2rem; align-items: end; margin-top: 1.5rem; }
+  .roll-controls .knob { flex: 1 1 180px; max-width: 300px; }
+  .btn.big { font-size: 1.05rem; padding: 0.6rem 1.5rem; }
+
+  .token.pop { animation: chip-pop var(--t-med) var(--ease-out); }
+  @keyframes chip-pop {
+    from { transform: scale(0.6); opacity: 0; }
+  }
+
+  .preset-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  .btn.preset .mono { font-weight: 500; font-size: 0.78rem; color: var(--ink-soft); margin-left: 0.45em; }
+  .btn.preset[aria-pressed="true"] { background: var(--marigold-tint); box-shadow: 0 3px 0 var(--ink); transform: translateY(-1px); }
+
+  .runs { margin-top: 1.6rem; display: grid; }
+  .run { display: grid; grid-template-columns: 7rem 1fr; gap: 0.9rem; align-items: start; padding-block: 0.85rem; }
+  .run + .run { border-top: 1px dashed var(--line); }
+  .run .run-label { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-soft); padding-top: 0.35rem; line-height: 1.45; }
+  .run .run-label b { display: block; font-family: var(--font-body); font-size: 0.92rem; font-weight: 700; color: var(--ink); }
+  .run .token-row .lead-in { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink-faint); }
+  @media (max-width: 520px) {
+    .run { grid-template-columns: 1fr; gap: 0.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>05</b> / prediction</p>
+    <h1>Rolling loaded dice</h1>
+    <p class="lede">A model never picks the next word. It scores every word it knows, then rolls dice loaded to match those scores. Here, you get to load the dice yourself.</p>
+  </header>
+
+  <!-- ============ Hero demo: the sampling playground ============ -->
+  <section class="section" aria-labelledby="demo1-title">
+    <div class="prose">
+      <h2 id="demo1-title">Load the dice yourself</h2>
+      <p>The sentence below has stopped mid-thought, and the model has just scored every candidate for the next word. Twelve of them are shown, already converted into probabilities: the bars are the dice. <strong>Temperature</strong> reshapes them, <strong>top-p</strong> trims the weird tail, and the roll button does exactly what the model does: pick one word, at random, in proportion to its bar.</p>
+      <p>One simplification, so you know we are being honest: a real model re-scores everything after each word it adds. This toy keeps the same scoreboard for every roll, so you can watch the dice instead of chasing them.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">the sampling playground · roll the dice</span>
+        <button class="btn small" id="hero-reset">reset</button>
+      </div>
+      <div class="stage-body" id="hero-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Drag temperature down to 0.1 and the dice barely wobble. Push it past 1.5 and keep an eye on <span class="mono">soup</span>.</p>
+  </section>
+
+  <!-- ============ How the knobs work ============ -->
+  <section class="section" aria-labelledby="how-title">
+    <div class="prose">
+      <h2 id="how-title">A score for every single word</h2>
+      <p>At every step, the model finishes its thinking with a score for <strong>every token in its vocabulary</strong>. Not the plausible ones: all of them, fifty thousand or so, including the emoji and the fragments of Finnish. Most score terribly, but nothing scores zero. That full scoreboard is squashed into probabilities, and then something has to choose.</p>
+      <p>The obvious choice is the top bar every time. That is called <strong>greedy</strong> decoding, and it turns out to be a personality flaw: greedy models repeat themselves, loop, and sand every sentence down to its most predictable version. A little randomness is not a bug you tolerate. It is what makes the output feel written rather than retrieved.</p>
+      <p>So you get two knobs. <strong>Temperature</strong> does not add noise; it reshapes the whole distribution. Below 1, gaps between scores get exaggerated and the favourite becomes a near-certainty. Above 1, the bars flatten out and long shots become live possibilities. <strong>Top-p</strong> handles the tail: sort the words by probability, keep the smallest set that covers p of the total, and throw the rest away entirely. The greyed-out words in the playground are the ones the dice can no longer land on, no matter how lucky.</p>
+    </div>
+  </section>
+
+  <!-- ============ Second demo: personality presets ============ -->
+  <section class="section" aria-labelledby="demo2-title">
+    <div class="prose">
+      <h2 id="demo2-title">Temperature is a personality</h2>
+      <p>Products built on these models rarely ask you for a temperature. They pick one for you, and that choice is most of what people describe as the model&rsquo;s vibe. Try the three presets: each one animates the knobs into place, then rolls six words in a row so you can see the setting as a personality. Watch <em>precise</em> roll the same word again and again; that is greedy decoding&rsquo;s whole personality in one line.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">personality presets · pick a vibe</span>
+      </div>
+      <div class="stage-body" id="preset-demo">
+        <div class="preset-row" role="group" aria-label="Sampling presets">
+          <button class="btn preset" data-name="precise" data-t="0.2" data-p="1">precise<span class="mono">T 0.2</span></button>
+          <button class="btn preset" data-name="default" data-t="0.8" data-p="0.95">default<span class="mono">T 0.8 · p 0.95</span></button>
+          <button class="btn preset" data-name="unhinged" data-t="1.8" data-p="1">unhinged<span class="mono">T 1.8</span></button>
+          <button class="btn" id="preset-roll">roll a line</button>
+        </div>
+        <div class="controls-row" style="margin-top:1.25rem;">
+          <div class="knob">
+            <div class="knob-label"><label for="t2-slider">temperature</label><span class="value" id="t2-val">0.80</span></div>
+            <input type="range" id="t2-slider" min="0.1" max="2" step="0.05" value="0.8">
+          </div>
+          <div class="knob">
+            <div class="knob-label"><label for="p2-slider">top-p</label><span class="value" id="p2-val">0.95</span></div>
+            <input type="range" id="p2-slider" min="0.1" max="1" step="0.01" value="0.95">
+          </div>
+        </div>
+        <div class="runs" id="runs" aria-live="polite" aria-label="Recent continuations"></div>
+      </div>
+    </div>
+    <p class="hint">Click <em>unhinged</em> twice. You will not get the same line twice. That is what the dial buys.</p>
+  </section>
+
+  <!-- ============ Closing prose ============ -->
+  <section class="section" aria-labelledby="why-title">
+    <div class="prose">
+      <h2 id="why-title">Why you never get the same answer twice</h2>
+      <p>Ask a chatbot the same question tomorrow and you may get a different answer, and now you know exactly where the fork happens. The scores are the same. The probabilities are the same. But at every single word, dice get rolled, and one early roll that lands on the second-favourite word sends the whole continuation down a different road.</p>
+      <p>That is the trade the people who tune these systems are making on your behalf: sharpen the dice and you get answers that are reliable but samey; flatten them and you get surprise, plus the occasional confident absurdity. The randomness is a dial, and someone chose where to set it.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../layers/"><span class="dir">&larr; previous</span>Neurons &amp; layers</a>
+    <a class="next" href="../position/"><span class="dir">next &rarr;</span>A sense of order</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/prediction.js"></script>
+</body>
+</html>

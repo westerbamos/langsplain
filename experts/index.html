@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experts · Langsplain</title>
+<meta name="description" content="Mixture of Experts: send a token to the router and watch it pick just two specialists out of eight, then compare the compute bill.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* Chapter-specific styles */
+  :root {
+    --moe-station-w: 6.2rem;
+  }
+
+  /* ----- Hero: the router ----- */
+  .moe-tray-label {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-bottom: 0.5rem;
+  }
+  .moe-arena { position: relative; margin-top: 2rem; }
+  .moe-overlay {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .moe-hub {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(2rem, 8vw, 4.5rem);
+    padding: 0.4rem 0 2.6rem;
+  }
+  .moe-router {
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.55rem 1.2rem;
+    border: var(--border-toy);
+    border-radius: 999px;
+    background: var(--paper);
+    transition: background var(--t-med) var(--ease-out), box-shadow var(--t-med) var(--ease-out);
+  }
+  .moe-router.thinking { background: var(--coral-tint); box-shadow: 0 3px 0 var(--ink); }
+  .moe-outlet {
+    min-width: 5rem; height: 2.5rem;
+    display: grid; place-items: center;
+    border: 2px dashed var(--ink-faint);
+    border-radius: var(--r-chip);
+    transition: border-color var(--t-med) var(--ease-out), background var(--t-med) var(--ease-out);
+  }
+  .moe-outlet.filled { border-color: var(--mint); border-style: solid; background: var(--mint-tint); }
+  .moe-outlet-label { font-size: 0.72rem; color: var(--ink-soft); }
+  .moe-experts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+  .moe-expert {
+    display: grid;
+    gap: 0.28rem;
+    width: var(--moe-station-w);
+    padding: 0.55rem 0.5rem 0.5rem;
+    border: var(--border-toy);
+    border-radius: 14px;
+    background: var(--paper);
+    font-family: var(--font-body);
+    text-align: center;
+    cursor: pointer;
+    transition: box-shadow var(--t-med) var(--ease-out), background var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+  }
+  .moe-expert:hover { background: var(--marigold-tint); transform: translateY(-1px); }
+  .moe-expert.chosen { box-shadow: 0 0 0 3px var(--coral); }
+  .moe-expert.visited { background: var(--marigold); }
+  .moe-exnum { font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); }
+  .moe-exname { font-size: 0.7rem; line-height: 1.25; font-weight: 600; min-height: 2.1em; }
+  .moe-gauge {
+    height: 8px;
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--paper-deep);
+  }
+  .moe-gauge-fill { height: 100%; width: 0%; background: var(--coral); }
+  .moe-pct { font-size: 0.68rem; color: var(--coral-deep); min-height: 1.1em; }
+  .moe-chip {
+    position: absolute;
+    left: 0; top: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 3px 0 var(--ink);
+  }
+  .moe-whoami { margin-top: 1.4rem; min-height: 1.5em; }
+  .moe-readout { margin-top: 0.5rem; font-size: 0.95rem; font-weight: 600; min-height: 1.6em; }
+
+  /* ----- The bill: dense vs sparse ----- */
+  .bill-lanes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem 2rem;
+  }
+  @media (max-width: 44rem) { .bill-lanes { grid-template-columns: 1fr; } }
+  .bill-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+  .bill-title { font-weight: 700; font-size: 0.92rem; }
+  .bill-units { font-size: 0.82rem; color: var(--ink-soft); }
+  .bill-count { font-weight: 600; color: var(--ink); font-size: 1.05rem; }
+  .bill-strip {
+    position: relative;
+    height: 4.2rem;
+    margin-top: 0.5rem;
+    border: 2px solid var(--line);
+    border-radius: var(--r-chip);
+    overflow: hidden;
+    background: oklch(0.985 0.006 85);
+  }
+  .bill-bank {
+    position: absolute;
+    left: 50%; bottom: 0.5rem;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+  }
+  .bill-cell {
+    width: 1.1rem; height: 1.6rem;
+    border: 2px solid var(--ink);
+    border-radius: 5px;
+    background: var(--paper-deep);
+    transition: background 120ms var(--ease-out);
+  }
+  .bill-cell.on { background: var(--coral); }
+  .bill-dot {
+    position: absolute;
+    left: 0; top: 0.5rem;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--cobalt);
+    border: 1.5px solid var(--ink);
+    will-change: transform;
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>07</b> / experts</p>
+    <h1>A committee where only two speak</h1>
+    <p class="lede">The biggest models are not one giant brain. They are a panel of specialists, and for every single token a tiny router picks just two of them to do the work.</p>
+  </header>
+
+  <!-- ============ Hero demo: the router ============ -->
+  <section class="section" aria-labelledby="demo1-title">
+    <div class="prose">
+      <h2 id="demo1-title">Eight desks, one dispatcher</h2>
+      <p>A few chapters back you met the MLP, the big blender that reworks each token's meaning. In a frontier model that blender gets so large that running all of it for every token would be absurd. So it gets sliced into independent specialists called <strong>experts</strong>, with a dispatcher out front: the <strong>router</strong>. Each arriving token is scored against all eight experts, sent to the top two, and handed back as a weighted blend of their answers.</p>
+      <p>Try it. The panel below is a miniature: eight experts with hand-labeled tastes and a router that really does the scoring math.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">the router · send a token, top 2 of 8 fire</span>
+        <button class="btn small" id="router-reset">reset</button>
+      </div>
+      <div class="stage-body" id="router-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Send <span class="mono">bonjour</span>, then <span class="mono">42</span>. Same tray, very different routes. Hover or tab across the stations to read their specialties.</p>
+  </section>
+
+  <!-- ============ The router is learned ============ -->
+  <section class="section" aria-labelledby="learned-title">
+    <div class="prose">
+      <h2 id="learned-title">Nobody handed out these jobs</h2>
+      <p>The router is not programmed, and neither are the specialties. The router is itself a small learned circuit, trained alongside everything else. Experts drift toward whatever division of labor makes prediction cheapest, and the split that emerges is rarely the tidy org chart a human would draw. Instead of a sports expert and a cooking expert, you tend to get experts for <em>textures</em>: one that perks up for punctuation, one for digits and units, one for the connective tissue between words.</p>
+      <p>Our eight nameplates are honest caricatures. Real experts have no labels at all, just habits you can only discover by watching which tokens the router keeps sending them. What is faithful here is the mechanism: real scores, a real softmax, the top two chosen, their answers blended in proportion. And every token takes its own route. In one sentence, <span class="mono">Paris</span> and the comma right after it may be handled by entirely different circuitry.</p>
+    </div>
+  </section>
+
+  <!-- ============ The bill ============ -->
+  <section class="section" aria-labelledby="demo2-title">
+    <div class="prose">
+      <h2 id="demo2-title">The bill</h2>
+      <p>Why bother with all this dispatching? Because of what it does to the bill. A <strong>dense</strong> model runs its entire MLP for every token, no exceptions. A <strong>sparse</strong> mixture-of-experts model keeps the same shelf of knowledge, all eight experts' worth of parameters, but each token only pays for the two it visits. Watch the meters.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">the bill · 20 tokens, dense vs sparse</span>
+        <div style="display:flex; gap:0.75rem; align-items:center;">
+          <div class="seg" role="group" aria-label="How many experts fire per token" id="k-seg"></div>
+          <button class="btn small primary" id="bill-run">run</button>
+        </div>
+      </div>
+      <div class="stage-body" id="bill-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Run the stream, then switch to <span class="mono">top-1</span> or <span class="mono">top-4</span>. The counter recomputes live. At <span class="mono">top-8</span>, sparse quietly becomes dense.</p>
+  </section>
+
+  <!-- ============ Active parameters ============ -->
+  <section class="section" aria-labelledby="active-title">
+    <div class="prose">
+      <h2 id="active-title">The number that matters</h2>
+      <p>This is the trick that lets frontier models get enormous without getting slow. Total parameter count tells you how much the model <em>knows</em>: the whole shelf, every expert included. But speed and cost per token are set by the <strong>active parameters</strong>, the slice that actually fires. A model can advertise hundreds of billions of parameters while each of your tokens only ever touches a fraction of them.</p>
+      <p>So when two models boast the same headline size, ask the follow-up question: how much of that wakes up per token? A committee where only two speak can afford to be a very large committee.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../position/"><span class="dir">← previous</span>A sense of order</a>
+    <a class="next" href="../speed/"><span class="dir">next →</span>Speed tricks</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/experts.js"></script>
+</body>
+</html>

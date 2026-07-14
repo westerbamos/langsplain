@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Position · Langsplain</title>
+<meta name="description" content="Attention reads everything at once, so it reads nothing in order. Play with the bag-of-words problem and the rotation trick that fixes it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* Page-specific styles for the position chapter */
+  #order-demo { --pouch-min: 230px; --tag-bg: var(--cobalt); }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  .stage-bar { flex-wrap: wrap; row-gap: 0.5rem; }
+  .bar-controls { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+
+  .order-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: stretch; }
+  @media (max-width: 760px) { .order-split { grid-template-columns: 1fr; } }
+  .order-panel { display: flex; flex-direction: column; }
+  .panel-label {
+    font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600;
+    color: var(--ink-soft); margin-bottom: 0.6rem;
+  }
+  #order-row { min-height: 3.2rem; align-content: flex-start; }
+  #order-demo .token { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; }
+  /* No transform transition on draggable chips: the pointer, FLIP animations,
+     and the grab lift need to own transform directly */
+  #order-row .token {
+    cursor: grab;
+    transition: background var(--t-med) var(--ease-out), box-shadow var(--t-med) var(--ease-out);
+  }
+  #order-row .token.active { cursor: grabbing; }
+
+  .pouch {
+    position: relative; flex: 1; min-height: var(--pouch-min);
+    border: var(--border-toy);
+    border-radius: 48% 52% 55% 45% / 58% 55% 45% 42%;
+    background: var(--paper-deep);
+  }
+  .pouch .token { position: absolute; cursor: default; }
+
+  .pos-tag {
+    position: absolute; top: -0.55rem; right: -0.55rem;
+    min-width: 1.25rem; height: 1.25rem; padding-inline: 0.15rem;
+    border-radius: 999px; background: var(--tag-bg); color: oklch(0.97 0.01 262);
+    border: 2px solid var(--ink);
+    font-family: var(--font-mono); font-size: 0.66rem; font-weight: 600;
+    display: grid; place-items: center;
+    transform: scale(0);
+    transition: transform var(--t-med) var(--ease-out);
+  }
+  #order-demo.tags-on .pos-tag { transform: scale(1); }
+
+  .verdict { margin-top: 1.4rem; }
+  .verdict .sig { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink-soft); overflow-wrap: anywhere; }
+  .verdict .call { font-weight: 700; margin-top: 0.3rem; }
+  .verdict .call.blind { color: var(--coral-deep); }
+  .verdict .call.aware { color: var(--mint-deep); }
+
+  /* --- rotation demo --- */
+  .dial-row { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: stretch; }
+  .pad-wrap { display: flex; gap: 4px; align-items: center; }
+  .pad-chip { width: 12px; height: 38px; border: 2px solid var(--line); border-radius: 6px; }
+  .pad-count { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); margin-right: 0.3rem; }
+
+  .dial-card {
+    display: grid; justify-items: center; align-content: start; gap: 0.35rem;
+    background: var(--paper); border: var(--border-toy); border-radius: 14px;
+    padding: 0.7rem 0.7rem 0.5rem; cursor: pointer; position: relative;
+    font-family: var(--font-body);
+    transition: background var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+  }
+  .dial-card:hover { background: var(--marigold-tint); }
+  .dial-card[data-sel] { background: var(--cobalt-tint); box-shadow: 0 3px 0 var(--ink); transform: translateY(-2px); }
+  .dial-word { font-family: var(--font-mono); font-size: 0.9rem; }
+  .dial-card .deg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-soft); }
+  .sel-badge {
+    position: absolute; top: -0.65rem; left: 50%; translate: -50% 0;
+    background: var(--cobalt); color: oklch(0.97 0.01 262);
+    border: 2px solid var(--ink); border-radius: 999px;
+    font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700;
+    min-width: 1.3rem; height: 1.3rem; display: none; place-items: center;
+  }
+  .dial-card[data-sel] .sel-badge { display: grid; }
+  .dials { display: flex; gap: 0.4rem; align-items: center; }
+  .fine-dial { display: none; }
+  #rope-demo.more .fine-dial { display: block; }
+
+  .diff-wrap { display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; align-items: center; margin-top: 1.75rem; }
+  .delta-val {
+    font-family: var(--font-mono); font-size: 2.1rem; font-weight: 600;
+    color: var(--mint-deep); background: var(--mint-tint);
+    border: var(--border-toy); border-radius: 12px;
+    padding: 0.1rem 0.7rem; display: inline-block;
+  }
+  .delta-caption { font-size: 0.92rem; color: var(--ink-soft); max-width: 36ch; margin-top: 0.55rem; }
+  .fine-delta { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink-soft); margin-top: 0.45rem; display: none; }
+  #rope-demo.more .fine-delta { display: block; }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>06</b> / position</p>
+    <h1>A sense of order</h1>
+    <p class="lede">Attention reads every word at the same time, which means it reads nothing in order. Something has to tell the model who came first.</p>
+  </header>
+
+  <!-- ============ Hero demo: the bag of words ============ -->
+  <section class="section" aria-labelledby="demo1-title">
+    <div class="prose">
+      <h2 id="demo1-title">The bag of words problem</h2>
+      <p>Order does more work in a sentence than you might think. <em>Man bites dog</em> is news; <em>dog bites man</em> is a Tuesday. Same three words, opposite story.</p>
+      <p>Now the catch. The attention mechanism from the last chapters compares words in pairs and adds up the results, and nothing in that recipe ever asks who came first. Left to itself, attention receives your sentence the way you receive Scrabble tiles: as a bag of words. The left panel below is the sentence you build. The right panel is, honestly, everything raw attention would get.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">word order · drag the words</span>
+        <div class="bar-controls">
+          <div class="seg" role="group" aria-label="Example sentence" id="preset-seg"></div>
+          <div class="seg" id="tag-toggle"><button aria-pressed="false">position tags</button></div>
+          <button class="btn small" id="order-reset">reset</button>
+        </div>
+      </div>
+      <div class="stage-body" id="order-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Drag the words into a new order, or focus a word, press <span class="mono">Enter</span> to grab it, and steer with the arrow keys. The bag refuses to notice. Then switch on <em>position tags</em>.</p>
+  </section>
+
+  <!-- ============ Seat numbers ============ -->
+  <section class="section" aria-labelledby="seats-title">
+    <div class="prose">
+      <h2 id="seats-title">Seat numbers</h2>
+      <p>The tags you just switched on are the blunt fix, and it is genuinely what the first transformer models did: before attention gets to look, stamp every word with its seat number. Word one wears a 1, word two wears a 2, and suddenly the bag can tell <em>man bites dog</em> from <em>dog bites man</em>, because the tiles themselves are different.</p>
+      <p>It works. But absolute seat numbers come with an itch. The phrase <em>the cat sat</em> means exactly the same thing whether it starts at word 3 or word 3,000, yet with absolute stamps those are different tiles, and the model has to learn the same pattern over and over at every address. What a sentence actually cares about is not where its words sit in the document, but how far apart they sit from each other.</p>
+    </div>
+  </section>
+
+  <!-- ============ RoPE demo ============ -->
+  <section class="section" aria-labelledby="demo2-title">
+    <div class="prose">
+      <h2 id="demo2-title">The rotation trick</h2>
+      <p>Modern models mostly use something slicker, called rotary position embeddings, RoPE to its friends. Forget stamps; think clock hands. Every word carries a small dial, and the hand turns a fixed amount for each seat the word sits from the start. Seat 1 points a little clockwise of seat 0, seat 2 a little more, and so on, forever.</p>
+      <p>The payoff: when attention compares two words, what it feels is not where either hand points, but the angle <em>between</em> them. And that angle depends only on how far apart the words are.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">rotation · click two words to compare</span>
+        <div class="seg" id="more-toggle"><button aria-pressed="false">more dials</button></div>
+      </div>
+      <div class="stage-body" id="rope-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Pick any two words, then drag the shift slider to shove invisible padding in front of the sentence. Every hand swings, but the mint angle between your pair refuses to budge.</p>
+  </section>
+
+  <!-- ============ Why distance beats address ============ -->
+  <section class="section" aria-labelledby="why-title">
+    <div class="prose">
+      <h2 id="why-title">Why distance beats address</h2>
+      <p>That stubborn mint number is the whole point. Because position lives in rotation, shifting a sentence deeper into a document spins every hand by the same amount, and the angles between words survive untouched. <em>The cat sat</em> feels identical to the model at word 3 and at word 3,000, no relearning required. Relationships are stored as distances, not addresses.</p>
+      <p>One dial speed cannot do it all, though. A slow hand separates neighbors nicely but barely moves across a whole chapter; a fast hand tracks long spans but blurs words that sit side by side. So real models give every word not one dial but dozens, from lazy to frantic, all turning at once. Flip on <em>more dials</em> above to see a second, faster hand doing its rounds. That spread of speeds is part of why modern models can keep their bearings across very long documents: somewhere in the stack there is always a dial turning at the right pace for the distance that matters.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../prediction/"><span class="dir">← previous</span>Prediction &amp; sampling</a>
+    <a class="next" href="../experts/"><span class="dir">next →</span>Mixture of Experts</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/position.js"></script>
+</body>
+</html>

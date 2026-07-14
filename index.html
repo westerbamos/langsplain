@@ -1,369 +1,106 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Langsplain - Interactive Transformer Explainer</title>
-    <meta name="description" content="Learn how LLMs work end-to-end with interactive Architecture, Training, and Inference diagrams and demos.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Langsplain · how language models actually work</title>
+<meta name="description" content="An interactive tour of modern LLM architecture: attention, experts, sampling and more. No math, all play.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<style>
+  .hero { padding: clamp(3rem, 9vw, 7rem) 0 clamp(2rem, 5vw, 4rem); }
+  .hero h1 { max-width: 14ch; }
+  .hero .lede { font-size: clamp(1.15rem, 2.4vw, 1.45rem); color: var(--ink-soft); margin-top: 1.4rem; max-width: 44ch; }
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  /* Journey list */
+  .journey { list-style: none; counter-reset: ch; margin-top: 1rem; }
+  .journey li { counter-increment: ch; border-top: 1px solid var(--line); }
+  .journey li:last-child { border-bottom: 1px solid var(--line); }
+  .journey a {
+    display: grid;
+    grid-template-columns: 3.5rem 1fr auto;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 1.05rem 0.5rem;
+    text-decoration: none;
+    color: var(--ink);
+    transition: background var(--t-fast) var(--ease-out), transform var(--t-med) var(--ease-out);
+  }
+  .journey a::before {
+    content: counter(ch, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--coral);
+  }
+  .journey .t { font-family: var(--font-display); font-weight: 750; font-size: clamp(1.25rem, 3vw, 1.8rem); letter-spacing: -0.01em; }
+  .journey .hook { display: block; font-size: 0.95rem; color: var(--ink-soft); font-family: var(--font-body); font-weight: 400; margin-top: 0.15rem; }
+  .journey .arrow { font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; color: var(--ink-faint); transition: transform var(--t-med) var(--ease-out), color var(--t-fast); }
+  .journey a:hover { background: var(--marigold-tint); }
+  .journey a:hover .arrow { transform: translateX(6px); color: var(--coral); }
 
-    <!-- D3.js -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-
-    <!-- Anime.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
-
-    <!-- Styles -->
-    <link rel="stylesheet" href="style.css">
-
-    <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%230a0a0a' width='32' height='32' rx='4'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='%2300d4ff'>◈</text></svg>">
+  /* Hero demo bits */
+  #hero-demo .prompt-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; min-height: 3.4rem; }
+  .prob-bars { display: grid; gap: 0.45rem; margin-top: 1.4rem; max-width: 30rem; }
+  .prob-bar { display: grid; grid-template-columns: 6.5rem 1fr 3.2rem; gap: 0.7rem; align-items: center; font-family: var(--font-mono); font-size: 0.9rem; }
+  .prob-bar .bar { height: 16px; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: var(--paper-deep); }
+  .prob-bar .fill { height: 100%; background: var(--mint); width: 0%; }
+  .prob-bar .pct { color: var(--ink-soft); font-size: 0.8rem; text-align: right; }
+  .prob-bar.winner .fill { background: var(--coral); }
+</style>
 </head>
 <body>
-    <!-- Navigation Header -->
-    <header class="nav-header">
-        <div class="nav-logo">
-            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="32" height="32" rx="6" fill="#141414"/>
-                <path d="M16 6L22 10V14L16 18L10 14V10L16 6Z" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-                <path d="M16 18L22 22V26L16 30L10 26V22L16 18Z" stroke="#a855f7" stroke-width="1.5" fill="none"/>
-                <circle cx="16" cy="18" r="2" fill="#00d4ff"/>
-            </svg>
-            <span>Langsplain</span>
-        </div>
 
-        <nav class="nav-links">
-            <a href="#" class="nav-link active" data-view="home" data-testid="nav-home">Home</a>
-            <a href="#" class="nav-link" data-view="glossary" data-testid="nav-glossary">Glossary</a>
-            <a href="#" class="nav-link" data-view="about" data-testid="nav-about">About</a>
-            <button class="tour-start-btn" data-testid="tour-start">Start Guided Tour</button>
-        </nav>
-    </header>
-
-    <!-- Main Container -->
-    <main class="main-container">
-        <!-- Home View -->
-        <div id="home-view" class="view active" data-testid="view-home">
-            <div class="section-switcher" role="tablist" aria-label="Model learning sections">
-                <button
-                    class="section-tab active"
-                    role="tab"
-                    aria-selected="true"
-                    tabindex="0"
-                    data-section="architecture"
-                    data-testid="section-tab-architecture"
-                >
-                    Architecture
-                </button>
-                <button
-                    class="section-tab"
-                    role="tab"
-                    aria-selected="false"
-                    tabindex="-1"
-                    data-section="training"
-                    data-testid="section-tab-training"
-                >
-                    Training
-                </button>
-                <button
-                    class="section-tab"
-                    role="tab"
-                    aria-selected="false"
-                    tabindex="-1"
-                    data-section="inference"
-                    data-testid="section-tab-inference"
-                >
-                    Inference
-                </button>
-            </div>
-
-            <section class="diagram-section">
-                <div class="diagram-container" id="diagram-container">
-                    <!-- SVG diagram rendered by D3.js -->
-                </div>
-
-                <div class="demo-buttons">
-                    <button class="demo-btn" data-demo="attention" data-sections="architecture" data-testid="demo-attention">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                        </svg>
-                        Attention Demo
-                    </button>
-                    <button class="demo-btn" data-demo="moe" data-sections="architecture" data-testid="demo-moe">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7" rx="1"/>
-                            <rect x="14" y="3" width="7" height="7" rx="1"/>
-                            <rect x="3" y="14" width="7" height="7" rx="1"/>
-                            <rect x="14" y="14" width="7" height="7" rx="1"/>
-                            <path d="M12 8v8M8 12h8"/>
-                        </svg>
-                        MOE Demo
-                    </button>
-                    <button class="demo-btn" data-demo="flow" data-sections="architecture" data-testid="demo-flow">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M5 12h14"/>
-                            <path d="M12 5l7 7-7 7"/>
-                        </svg>
-                        Animate Flow
-                    </button>
-                    <button class="demo-btn hidden" data-demo="gradient" data-sections="training" data-testid="demo-gradient">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 19l6-6 4 4 6-10"/>
-                            <circle cx="10" cy="13" r="1"/>
-                            <circle cx="14" cy="17" r="1"/>
-                        </svg>
-                        Gradient Demo
-                    </button>
-                    <button class="demo-btn hidden" data-demo="loss" data-sections="training" data-testid="demo-loss">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 19h16"/>
-                            <rect x="5" y="12" width="2" height="7"/>
-                            <rect x="10" y="9" width="2" height="10"/>
-                            <rect x="15" y="6" width="2" height="13"/>
-                        </svg>
-                        Loss Demo
-                    </button>
-                    <button class="demo-btn hidden" data-demo="sampling" data-sections="inference" data-testid="demo-sampling">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 20h18"/>
-                            <path d="M5 20v-8"/>
-                            <path d="M9 20v-12"/>
-                            <path d="M13 20v-6"/>
-                            <path d="M17 20v-10"/>
-                            <path d="M21 20v-4"/>
-                        </svg>
-                        Sampling Demo
-                    </button>
-                    <button class="demo-btn hidden" data-demo="kvcache" data-sections="inference" data-testid="demo-kvcache">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2"/>
-                            <path d="M3 9h18"/>
-                            <path d="M9 3v18"/>
-                            <path d="M15 9v12"/>
-                        </svg>
-                        KV Cache Demo
-                    </button>
-                    <button class="demo-btn hidden" data-demo="generation" data-sections="inference" data-testid="demo-generation">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 12h10"/>
-                            <path d="M10 8l4 4-4 4"/>
-                            <path d="M15 6h5M15 12h5M15 18h5"/>
-                        </svg>
-                        Generation Demo
-                    </button>
-                </div>
-            </section>
-        </div>
-
-        <!-- Glossary View -->
-        <div id="glossary-view" class="view" data-testid="view-glossary">
-            <div class="glossary-container">
-                <div class="glossary-header">
-                    <h1>Glossary</h1>
-                    <p>Key terms and concepts in transformer-based LLMs</p>
-                </div>
-
-                <div class="glossary-search">
-                    <input type="text" id="glossary-search" placeholder="Search terms...">
-                </div>
-
-                <div class="glossary-list" id="glossary-list">
-                    <!-- Rendered by JavaScript -->
-                </div>
-            </div>
-        </div>
-
-        <!-- About View -->
-        <div id="about-view" class="view" data-testid="view-about">
-            <div class="about-container">
-                <div class="about-header">
-                    <h1>About This Project</h1>
-                </div>
-
-                <div class="about-content">
-                    <p>
-                        <strong>Langsplain</strong> is an interactive educational tool designed to help
-                        you understand how modern Large Language Models work under the hood.
-                    </p>
-
-                    <h2>What You'll Learn</h2>
-                    <ul>
-                        <li><strong>Architecture:</strong> tokenization, embeddings, attention, FFN/MOE, and output projection</li>
-                        <li><strong>Training:</strong> data preparation, loss optimization, backpropagation, and post-training alignment</li>
-                        <li><strong>Inference:</strong> prefill, KV cache, sampling, decode loops, and stop conditions</li>
-                    </ul>
-
-                    <h2>Interactive Features</h2>
-                    <ul>
-                        <li><strong>Guided Tour:</strong> Walkthrough across Architecture, Training, and Inference</li>
-                        <li><strong>Section-Specific Diagrams:</strong> Click any component to open detailed explanations</li>
-                        <li><strong>Attention Demo:</strong> Visualize how tokens attend to each other</li>
-                        <li><strong>MOE Demo:</strong> See how routing works in expert models</li>
-                        <li><strong>Gradient Demo:</strong> Step through optimization on a 2D loss surface</li>
-                        <li><strong>Loss Demo:</strong> Watch cross-entropy and perplexity change during training</li>
-                        <li><strong>Sampling Demo:</strong> Explore temperature, top-k, and top-p effects</li>
-                        <li><strong>KV Cache Demo:</strong> Compare cached vs uncached generation cost</li>
-                        <li><strong>Generation Demo:</strong> Step through prefill + autoregressive decode</li>
-                    </ul>
-
-                    <h2>Further Learning</h2>
-                    <ul>
-                        <li><a href="https://arxiv.org/abs/1706.03762" target="_blank">Attention Is All You Need</a> - The original transformer paper</li>
-                        <li><a href="https://jalammar.github.io/illustrated-transformer/" target="_blank">The Illustrated Transformer</a> - Visual guide by Jay Alammar</li>
-                        <li><a href="https://arxiv.org/abs/2101.03961" target="_blank">Switch Transformers</a> - MOE at scale</li>
-                        <li><a href="https://karpathy.ai/zero-to-hero.html" target="_blank">Neural Networks: Zero to Hero</a> - Andrej Karpathy's course</li>
-                    </ul>
-
-                    <h2>Technical Notes</h2>
-                    <p>
-                        This visualization uses simplified, toy-sized models for demonstration purposes.
-                        Real LLMs have much larger dimensions (e.g., 4096-8192 vs our 64) and more layers
-                        (32-96 vs our 3). The attention patterns shown are computed on actual (tiny) weights
-                        but won't match production model behavior.
-                    </p>
-
-                    <h2>Credits</h2>
-                    <p>
-                        Built with vanilla JavaScript, D3.js for visualizations, and Anime.js for animations.
-                        No framework dependencies - just clean, educational code.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Info Panel (Right Sidebar) -->
-    <aside id="info-panel" class="info-panel">
-        <div class="panel-header">
-            <h2 class="panel-title">Component</h2>
-            <button class="panel-close" aria-label="Close panel" data-testid="info-panel-close">&times;</button>
-        </div>
-        <div class="panel-content">
-            <div class="simple-explanation">
-                <!-- Beginner-friendly explanation -->
-            </div>
-            <details class="technical-details">
-                <summary>Show Technical Details</summary>
-                <div class="technical-content">
-                    <!-- Technical explanation with formulas -->
-                </div>
-            </details>
-        </div>
-    </aside>
-
-    <!-- Attention Demo Modal -->
-    <div id="attention-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Attention Visualization</h2>
-                <button class="modal-close" aria-label="Close modal" data-testid="modal-close-attention">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="attention-demo-content">
-                    <!-- Rendered by AttentionDemoUI -->
-                </div>
-            </div>
-        </div>
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="./">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="#journey">Chapters</a>
     </div>
+  </nav>
+</header>
 
-    <!-- MOE Demo Modal -->
-    <div id="moe-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Mixture of Experts</h2>
-                <button class="modal-close" aria-label="Close modal" data-testid="modal-close-moe">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="moe-demo-content">
-                    <!-- Rendered by MOEDemoUI -->
-                </div>
-            </div>
-        </div>
+<main class="wrap">
+  <section class="hero">
+    <h1>How does a machine finish your sentence?</h1>
+    <p class="lede">A hands-on tour of what’s inside a large language model. No equations, no code: every idea is a toy you can poke.</p>
+  </section>
+
+  <section aria-label="Live demo: next-word prediction">
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">live · a model’s entire job, on loop</span>
+        <button class="btn small" id="hero-again">start over</button>
+      </div>
+      <div class="stage-body" id="hero-demo">
+        <noscript><p>The demos on this site need JavaScript.</p></noscript>
+      </div>
     </div>
+    <p class="hint">That’s the whole trick: guess the next word, append it, repeat. Everything below explains how the guessing gets so good.</p>
+  </section>
 
-    <!-- Sampling Demo Modal -->
-    <div id="sampling-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Sampling Strategies</h2>
-                <button class="modal-close" aria-label="Close modal" data-testid="modal-close-sampling">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="sampling-demo-content">
-                    <!-- Rendered by SamplingDemoUI -->
-                </div>
-            </div>
-        </div>
-    </div>
+  <section class="section" id="journey" aria-labelledby="journey-title">
+    <h2 id="journey-title">The journey</h2>
+    <ol class="journey">
+      <li><a href="tokens/"><span class="t">Tokens<span class="hook">Chopping language into pieces a machine can count.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="embeddings/"><span class="t">Meaning as a map<span class="hook">Every word gets coordinates. Nearby means similar.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="attention/"><span class="t">Attention<span class="hook">Every word looks back and decides what matters.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="layers/"><span class="t">Neurons &amp; layers<span class="hook">Tiny pattern detectors, stacked until they understand.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="prediction/"><span class="t">Prediction &amp; sampling<span class="hook">Turning hunches into words: temperature, top-p, and dice.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="position/"><span class="t">A sense of order<span class="hook">How a model knows “dog bites man” isn’t “man bites dog”.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="experts/"><span class="t">Mixture of Experts<span class="hook">A committee of specialists, and only two get to speak.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="speed/"><span class="t">Speed tricks<span class="hook">KV caches, shrunken numbers, and guessing ahead.</span></span><span class="arrow">→</span></a></li>
+      <li><a href="training/"><span class="t">Training<span class="hook">Where the knowledge comes from, and why models make things up.</span></span><span class="arrow">→</span></a></li>
+    </ol>
+  </section>
+</main>
 
-    <!-- KV Cache Demo Modal -->
-    <div id="kvcache-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>KV Cache Visualization</h2>
-                <button class="modal-close" aria-label="Close modal" data-testid="modal-close-kvcache">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="kvcache-demo-content">
-                    <!-- Rendered by KVCacheDemoUI -->
-                </div>
-            </div>
-        </div>
-    </div>
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
 
-    <!-- Gradient Demo Modal -->
-    <div id="gradient-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Gradient Descent</h2>
-                <button class="modal-close" aria-label="Close modal" data-testid="modal-close-gradient">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="gradient-demo-content">
-                    <!-- Rendered by GradientDemoUI -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Loss Demo Modal -->
-    <div id="loss-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Loss and Learning</h2>
-                <button class="modal-close" aria-label="Close modal" data-testid="modal-close-loss">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="loss-demo-content">
-                    <!-- Rendered by LossDemoUI -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Generation Demo Modal -->
-    <div id="generation-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Autoregressive Generation</h2>
-                <button class="modal-close" aria-label="Close modal" data-testid="modal-close-generation">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="generation-demo-content">
-                    <!-- Rendered by GenerationDemoUI -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Application Script -->
-    <script type="module" src="app.js"></script>
-
-    <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "86d63f80fea3459c8aba64bf57a59240"}'></script><!-- End Cloudflare Web Analytics -->
+<script type="module" src="assets/js/home.js"></script>
 </body>
 </html>

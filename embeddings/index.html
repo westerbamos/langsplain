@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embeddings · Langsplain</title>
+<meta name="description" content="Play with a map of meaning: every word becomes coordinates, neighbours mean neighbours, and word arithmetic actually works.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* Chapter-specific styles, built from the shared custom properties */
+  .map-scroll { overflow-x: auto; }
+  .map-svg { display: block; width: 100%; min-width: 620px; height: auto; }
+
+  .map-svg .cluster-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    fill: var(--ink-faint);
+  }
+  .map-svg .word { cursor: default; }
+  .map-svg .word.tappable { cursor: pointer; }
+  .map-svg .word .dot {
+    fill: var(--ink-faint);
+    stroke: none;
+    r: 3.5px;
+    transition: r var(--t-fast) var(--ease-out), fill var(--t-fast) var(--ease-out);
+  }
+  .map-svg .word .wlabel {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: var(--ink-soft);
+    text-anchor: middle;
+    paint-order: stroke;
+    stroke: oklch(0.985 0.006 85);
+    stroke-width: 3.5px;
+    stroke-linejoin: round;
+    transition: fill var(--t-fast) var(--ease-out);
+  }
+  .map-svg .word { transition: opacity var(--t-med) var(--ease-out); }
+  .map-svg.has-sel .word:not(.sel):not(.nbr):not(.op):not(.ans) { opacity: 0.42; }
+
+  .map-svg .word.tappable:hover .dot,
+  .map-svg .word.tappable:focus-visible .dot { fill: var(--marigold); r: 5.5px; stroke: var(--ink); stroke-width: 1.5px; }
+  .map-svg .word:focus-visible { outline: none; }
+  .map-svg .word:focus-visible .wlabel { fill: var(--ink); font-weight: 600; }
+  .map-svg .word:focus-visible .halo { stroke: var(--cobalt); stroke-width: 2px; fill: none; opacity: 1; }
+
+  .map-svg .word.sel .dot { fill: var(--marigold); r: 6px; stroke: var(--ink); stroke-width: 1.5px; }
+  .map-svg .word.sel .wlabel { fill: var(--ink); font-weight: 600; }
+  .map-svg .word.nbr .dot { fill: var(--coral); r: 5px; stroke: var(--ink); stroke-width: 1px; }
+  .map-svg .word.nbr .wlabel { fill: var(--coral-deep); font-weight: 600; }
+  .map-svg .word.op .dot { fill: var(--cobalt); r: 5px; stroke: var(--ink); stroke-width: 1px; }
+  .map-svg .word.op .wlabel { fill: var(--cobalt-deep); font-weight: 600; }
+  .map-svg .word.ans .dot { fill: var(--mint); r: 6px; stroke: var(--ink); stroke-width: 1.5px; }
+  .map-svg .word.ans .wlabel { fill: var(--mint-deep); font-weight: 600; }
+
+  .nbr-line {
+    stroke: var(--coral);
+    fill: none;
+    stroke-linecap: round;
+    transition: stroke-dashoffset var(--t-slow) var(--ease-out);
+  }
+  .vec-line { fill: none; stroke-linecap: round; }
+
+  .stage-bar .presets { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; }
+
+  .nbr-panel { margin-top: 1rem; }
+  .nbr-panel .token small {
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 0.72em;
+    color: var(--ink-soft);
+    margin-left: 0.45em;
+  }
+  .eq-row { margin-block: 0.25rem 1rem; font-family: var(--font-mono); font-size: 1.05rem; }
+  .eq-row .sign { padding-inline: 0.15rem; color: var(--ink-soft); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>02</b> / embeddings</p>
+    <h1>Meaning as a map</h1>
+    <p class="lede">Before a model can think about a word, it turns the word into a point on a map. Similar meanings land close together. This chapter hands you the map.</p>
+  </header>
+
+  <!-- ============ Hero demo: the map of meaning ============ -->
+  <section class="section" aria-labelledby="demo1-title">
+    <div class="prose">
+      <h2 id="demo1-title">Every word gets an address</h2>
+      <p>Each token from the last chapter gets swapped for a list of numbers called an <strong>embedding</strong>. You can read that list as coordinates: how far east, how far north, and so on. Words stop being spellings and become places.</p>
+      <p>And once words are places, meaning becomes geometry. <em>Cat</em> sits near <em>dog</em> not because they share letters, but because they turn up in the same sorts of sentences, so they get filed in the same neighbourhood. Distance on the map is disagreement in meaning.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">map of meaning · tap any word</span>
+        <div class="presets" role="group" aria-label="Jump to a word" id="preset-row"></div>
+      </div>
+      <div class="stage-body">
+        <div class="map-scroll" id="hero-map">
+          <noscript><p>This demo needs JavaScript.</p></noscript>
+        </div>
+        <div class="nbr-panel" id="nbr-panel" aria-live="polite"></div>
+      </div>
+    </div>
+    <p class="hint">Hover, tap, or tab to any word. Its four nearest neighbours light up, ranked by measured distance.</p>
+  </section>
+
+  <!-- ============ Direction is meaning ============ -->
+  <section class="section" aria-labelledby="demo2-title">
+    <div class="prose">
+      <h2 id="demo2-title">Direction is meaning</h2>
+      <p>The map has a second trick. It is not just <em>where</em> a word sits, it is <em>which way</em> things point. The little hop from <em>man</em> to <em>woman</em> points the same way as the hop from <em>king</em> to <em>queen</em>. The hop from a country to its capital is another repeatable arrow. Meanings you can name become directions you can reuse.</p>
+      <p>Which means you can do arithmetic with words: start at <em>king</em>, walk backwards along the <em>man</em> arrow, forwards along the <em>woman</em> arrow, and look around for the nearest word to where you landed.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">word arithmetic · pick an equation</span>
+        <div class="seg" role="group" aria-label="Choose an equation" id="eq-seg"></div>
+      </div>
+      <div class="stage-body">
+        <div class="token-row eq-row" id="eq-chips" role="group"></div>
+        <div class="map-scroll" id="math-map"></div>
+        <div class="controls-row" style="align-items:center;">
+          <button class="btn primary" id="eq-run">run the arithmetic</button>
+          <p class="hint" id="eq-result" aria-live="polite" style="margin:0;">press run and watch the arrows.</p>
+        </div>
+      </div>
+    </div>
+    <p class="hint">The blue arrow is the measured difference between two words. The dashed copy is that same arrow carried over and re-applied. The landing spot snaps to the nearest real word.</p>
+  </section>
+
+  <!-- ============ The confession ============ -->
+  <section class="section" aria-labelledby="honest-title">
+    <div class="prose">
+      <h2 id="honest-title">Two dimensions is a polite lie</h2>
+      <p>Full disclosure: we drew this map by hand, in two dimensions, so it fits on your screen and the arithmetic lands cleanly. The distances and arrows are genuinely computed from the coordinates, but the coordinates themselves came from us, not from a model.</p>
+      <p>A real model writes nothing by hand. It starts with every word at a random spot, reads a trillion words of text, and nudges the points a little every time a prediction goes wrong. Words that behave alike drift together; words that behave differently drift apart. The map is a fossil record of everything the model has read.</p>
+      <p>And it does not use two numbers per word. It uses thousands. That sounds unpicturable, and it is, but the rules you just played with survive the trip: nearby still means similar, and directions still carry meanings. There are simply enough spare directions that <em>royalty</em>, <em>plural</em>, <em>past tense</em>, and <em>France-ness</em> can each have their own, without elbowing each other.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../tokens/"><span class="dir">← previous</span>Tokens</a>
+    <a class="next" href="../attention/"><span class="dir">next →</span>Attention</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/embeddings.js"></script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training · Langsplain</title>
+<meta name="description" content="Train a tiny model in your browser, run your own taste tests, and watch a fluent guesser invent a moon capital.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bar-h: 1.15rem;
+    --panel-r: 14px;
+  }
+
+  /* Demo 1: corpus reader */
+  .corpus {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    line-height: 2;
+    max-height: 11.5rem;
+    overflow-y: auto;
+    border: var(--border-toy);
+    border-radius: var(--panel-r);
+    padding: 0.9rem 1.1rem;
+    background: var(--paper);
+  }
+  .corpus .cw {
+    opacity: 0.3;
+    border-radius: 6px;
+    padding: 0.05rem 0.15rem;
+    transition: opacity var(--t-med) var(--ease-out), background var(--t-fast) var(--ease-out);
+  }
+  .corpus .cw.read { opacity: 1; }
+  .corpus .cw.now { background: var(--marigold); opacity: 1; }
+
+  .tally-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+  .tally {
+    flex: 1 1 200px;
+    border: var(--border-toy);
+    border-radius: var(--panel-r);
+    padding: 0.8rem 0.9rem;
+    background: var(--paper);
+  }
+  .tally h4 {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-bottom: 0.55rem;
+  }
+  .tally h4 .tw { background: var(--cobalt-tint); border-radius: 6px; padding: 0.05rem 0.3rem; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 5.2rem 1fr 2.6rem;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+  .bar-row + .bar-row { margin-top: 0.35rem; }
+  .bar-row .bw { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .bar-row .bt {
+    height: var(--bar-h);
+    border-radius: 6px;
+    background: var(--paper-deep);
+    border: 1.5px solid var(--line);
+    overflow: hidden;
+  }
+  .bar-row .bf {
+    height: 100%;
+    background: var(--mint);
+    border-radius: 4px;
+    width: 0%;
+    transition: width var(--t-med) var(--ease-out);
+  }
+  .bar-row .bf.uniform { background: var(--paper-deep); border-right: 2px solid var(--ink-faint); }
+  .bar-row .bv { color: var(--ink-soft); }
+
+  .quiz-panel {
+    border: var(--border-toy);
+    border-radius: var(--panel-r);
+    padding: 0.9rem 1.1rem;
+    background: var(--paper);
+    margin-top: 1.25rem;
+  }
+  .quiz-cols { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 0.7rem; }
+  .quiz-col { flex: 1 1 240px; }
+  .quiz-col h4 { font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 0.5rem; }
+
+  .surprise {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+  .surprise .st {
+    height: 14px;
+    border-radius: 999px;
+    background: var(--paper-deep);
+    border: 2px solid var(--ink);
+    overflow: hidden;
+  }
+  .surprise .sf {
+    height: 100%;
+    background: var(--coral);
+    width: 100%;
+    transition: width var(--t-med) var(--ease-out);
+  }
+  .surprise .sv { font-family: var(--font-mono); font-weight: 500; color: var(--ink-soft); min-width: 7.5ch; text-align: right; }
+
+  /* Demo 2: taste test */
+  .cand-pair { display: grid; gap: 1rem; grid-template-columns: 1fr; margin-top: 0.75rem; }
+  @media (min-width: 640px) { .cand-pair { grid-template-columns: 1fr 1fr; } }
+  .cand {
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    text-align: left;
+    border: var(--border-toy);
+    border-radius: var(--panel-r);
+    background: var(--paper);
+    padding: 0.9rem 1rem 1rem;
+    cursor: pointer;
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+    transition: background var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
+  }
+  .cand:hover { background: var(--marigold-tint); transform: translateY(-2px); box-shadow: 0 3px 0 var(--ink); }
+  .cand:active { transform: translateY(0); box-shadow: none; }
+  .cand.picked { background: var(--marigold-tint); box-shadow: 0 3px 0 var(--ink); }
+  .cand.dimmed { opacity: 0.45; }
+  .cand .cl {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+  .rl-prompt {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    background: var(--cobalt-tint);
+    border: var(--border-toy);
+    border-radius: var(--panel-r);
+    padding: 0.6rem 0.9rem;
+    display: inline-block;
+  }
+  .meters { margin-top: 1.5rem; display: grid; gap: 0.55rem; max-width: 440px; }
+  .meters .bar-row { grid-template-columns: 5.2rem 1fr 3.2rem; }
+  .meters .bf { background: var(--mint); }
+  .final-panel {
+    margin-top: 1.5rem;
+    border: var(--border-toy);
+    border-radius: var(--panel-r);
+    background: var(--mint-tint);
+    padding: 1rem 1.1rem;
+  }
+  .final-panel .fl { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600; color: var(--mint-deep); margin-bottom: 0.45rem; }
+  .final-panel .ft { font-size: 1rem; line-height: 1.6; min-height: 3.2em; }
+
+  /* Demo 3: hallucination bars */
+  .hall-prompt { font-family: var(--font-mono); font-size: 1rem; margin-bottom: 1rem; }
+  .hall-prompt .blank { border-bottom: 3px solid var(--coral); padding-inline: 0.4rem; }
+  .hall-rows { display: grid; gap: 0.55rem; }
+  .hall-rows .bar-row { grid-template-columns: 9.5rem 1fr 3.2rem; }
+  .hall-rows .bf { transition: none; }
+  .hall-rows .bw { text-align: right; }
+  .hall-rows .honest .bw { color: var(--mint-deep); font-weight: 600; }
+  .hall-rows .honest .bf { background: var(--mint); }
+  .hall-rows .fluent .bf { background: var(--coral); }
+
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px;
+    clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>09</b> / training</p>
+    <h1>Where the knowing comes from</h1>
+    <p class="lede">Nobody typed facts into the model. It read, it guessed, it got corrected, trillions of times. You can watch the whole idea happen in miniature, right here.</p>
+  </header>
+
+  <!-- ============ Demo 1: pretraining ============ -->
+  <section class="section" aria-labelledby="pre-title">
+    <div class="prose">
+      <h2 id="pre-title">Reading as a workout</h2>
+      <p>Pretraining is one game played at absurd scale: cover the next word, guess it, peek, adjust. No rules are written down. The model earns everything it knows by being wrong slightly less often, word after word, across trillions of words of text.</p>
+      <p>The model below is real and it starts out knowing nothing. Press <strong>read</strong> and it will read a tiny story, keeping real counts of which word follows which. Every bar you see is a real tally, built in your browser, right now.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">pretraining · guess, peek, adjust</span>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn small primary" id="read-btn">read</button>
+          <button class="btn small" id="reset-pre">reset</button>
+        </div>
+      </div>
+      <div class="stage-body">
+        <div class="corpus" id="corpus" aria-label="Training text"></div>
+
+        <div class="surprise">
+          <span>surprise</span>
+          <div class="st" role="img" aria-hidden="true"><div class="sf" id="surprise-fill"></div></div>
+          <span class="sv" id="surprise-val">not yet</span>
+        </div>
+        <p class="hint" id="surprise-hint">the surprise meter is the model wincing: high means "did not see that word coming". Watch it sink as the counts grow.</p>
+
+        <div class="tally-grid" id="tallies"></div>
+
+        <div class="quiz-panel">
+          <p style="font-size:0.9rem; font-weight:700;">pop quiz: <span class="mono">the ___</span></p>
+          <div class="quiz-cols">
+            <div class="quiz-col">
+              <h4>before reading: every word is an equal shrug</h4>
+              <div id="quiz-before"></div>
+            </div>
+            <div class="quiz-col">
+              <h4>after reading: the counts do the talking</h4>
+              <div id="quiz-after"></div>
+            </div>
+          </div>
+          <p class="visually-hidden" role="status" id="quiz-summary"></p>
+        </div>
+
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Press <strong>read it again</strong> when it finishes. More data means sharper bars: the same story twice is twice the evidence.</p>
+
+    <div class="prose" style="margin-top:1.5rem;">
+      <p>Scale this up and something odd happens. To keep winning the guessing game on real text, mere word pairs stop being enough. Predicting the next word of "the boiling point of water is" requires knowing chemistry. Predicting dialogue requires a feel for people. The knowledge is never the goal; it is the residue of getting better at guessing.</p>
+    </div>
+  </section>
+
+  <!-- ============ Demo 2: RLHF ============ -->
+  <section class="section" aria-labelledby="rl-title">
+    <div class="prose">
+      <h2 id="rl-title">The taste test</h2>
+      <p>After all that reading, the model can continue any text, which is not the same as being helpful. It might answer your question, or write a plausible next paragraph of a forum argument. So there is a second phase: humans read pairs of answers and pick the better one, thousands of times. The model learns to lean toward whatever the raters kept picking.</p>
+      <p>For the next minute, you are the rater. Same question, two answers, choose the one you would rather receive. Do it three times and watch the taste meters move.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title" id="rl-round">taste test · round 1 of 3</span>
+        <button class="btn small" id="rl-reset">start over</button>
+      </div>
+      <div class="stage-body">
+        <p class="rl-prompt">Explain rain to a five-year-old.</p>
+        <div class="cand-pair" id="cand-pair"></div>
+
+        <div class="meters" aria-live="polite" id="meters"></div>
+
+        <div id="final-slot"></div>
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Pick whichever answer you would actually want. There is no right answer, only your taste, and that is exactly the point.</p>
+
+    <div class="prose" style="margin-top:1.5rem;">
+      <p>Notice what this phase does not do: it adds no facts. The model knew about clouds before you clicked anything. Your choices tuned its manner: warmer or stiffer, longer-winded or brisker. This is why people say fine-tuning teaches taste, not knowledge. The librarian read the library long ago; the taste tests teach it how to talk to you at the front desk.</p>
+    </div>
+  </section>
+
+  <!-- ============ Demo 3: hallucination ============ -->
+  <section class="section" aria-labelledby="hall-title">
+    <div class="prose">
+      <h2 id="hall-title">The machine that must answer</h2>
+      <p>Here is the uncomfortable part. The model's whole reflex is "produce the most likely next word". It cannot leave a blank. Ask it something with no true answer and the reflex fires anyway, fluently. A hallucination is not a glitch; it is a very good guesser doing its job with nothing true to guess.</p>
+      <p>"I don't know" is not a special escape hatch either. It is just another phrase, competing for probability like every other phrase. It wins only if training made it likely to win.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">one word must win</span>
+        <div class="seg" role="group" aria-label="Training style" id="hall-toggle"></div>
+      </div>
+      <div class="stage-body">
+        <p class="hall-prompt">The capital of the moon is <span class="blank">&nbsp;&nbsp;&nbsp;</span></p>
+        <div class="hall-rows" id="hall-rows" role="img" aria-label="Probability of each continuation"></div>
+        <p class="visually-hidden" role="status" id="hall-summary"></p>
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Flip the toggle. Nothing about the moon changed; only the training did. Admitting uncertainty is a habit a model has to be taught, one taste test at a time.</p>
+
+    <div class="prose" style="margin-top:1.5rem;">
+      <p>In the untrained setting, "New" wins because the internet is full of sentences like "the capital of New Zealand", and capitals named New Something. The shape of the guess is perfect; only the world is missing. That is what a confident hallucination looks like from the inside: probability with no referent.</p>
+    </div>
+  </section>
+
+  <!-- ============ Outro ============ -->
+  <section class="section" aria-labelledby="outro-title">
+    <div class="prose">
+      <h2 id="outro-title">The whole machine, in one breath</h2>
+      <p>This was the last chapter, so step back and look at what you have built up. Text becomes tokens. Tokens become points on a map of meaning. Attention lets every word study the words before it. Layers of small judgments stack into deep ones. The stack ends in a guess about one next word. Experts split the work, clever caches and shortcuts make it fast, and squeezing the numbers makes it fit. Then training, the chapter you just played through, is where all of it gets its content: read everything, guess constantly, and let human taste do the final polish.</p>
+      <p>Nine ideas, snapped together like bricks. No ghost in the machine, which is somehow the more remarkable outcome: a fluent, occasionally over-confident guesser built out of counting and correction. Now when someone asks you how these things work, you can do better than a shrug. You can hand them this and say: go play.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../speed/"><span class="dir">← previous</span>Speed tricks</a>
+    <a class="next" href="../"><span class="dir">next →</span>Home</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/training.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attention · Langsplain</title>
+<meta name="description" content="Play with attention: click a word and watch it decide which earlier words matter.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>03</b> / attention</p>
+    <h1>Every word looks back</h1>
+    <p class="lede">Before a model writes anything, each word gets to study the words before it and decide which ones matter. That deciding is called attention.</p>
+  </header>
+
+  <!-- ============ Hero demo: whose "it"? ============ -->
+  <section class="section" aria-labelledby="demo1-title">
+    <div class="prose">
+      <h2 id="demo1-title">Whose “it” is it?</h2>
+      <p>Read this sentence and notice what your own brain just did: <em>“The robot dropped the ball because it was slippery.”</em> You knew “it” meant the ball. Swap <em>slippery</em> for <em>clumsy</em> and “it” silently switches to the robot. Attention is the machinery that lets a model make that same move.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">attention · click any word</span>
+        <div class="seg" role="group" aria-label="Last word of the sentence" id="adj-toggle"></div>
+      </div>
+      <div class="stage-body" id="hero-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Click <span class="mono">it</span>, then flip the last word between <em>slippery</em> and <em>clumsy</em>. Watch where the lines go.</p>
+  </section>
+
+  <!-- ============ How the deciding works ============ -->
+  <section class="section" aria-labelledby="how-title">
+    <div class="prose">
+      <h2 id="how-title">Questions and name tags</h2>
+      <p>Each word broadcasts two things: a <strong>question</strong> (“I’m a pronoun, who could I refer to?”) and a <strong>name tag</strong> (“I’m a physical object”, “I’m an action”). A word compares its question against every earlier name tag; good matches score high. The scores become percentages, and the word blends the matching words together in those proportions. That blend becomes its new, context-aware meaning.</p>
+      <p>So after attention runs, the word “it” isn’t a bare pronoun anymore. It’s carrying a payload that is mostly <em>ball</em> (or mostly <em>robot</em>, if you flipped the word). Nothing was looked up in a dictionary; the sentence explained itself to itself.</p>
+      <p>One rule: a word may only look <strong>backwards</strong>. The model reads the way you write, left to right, so future words are behind a curtain. That’s why the words after your selection go grey in the demo.</p>
+    </div>
+  </section>
+
+  <!-- ============ Everyone at once ============ -->
+  <section class="section" aria-labelledby="demo2-title">
+    <div class="prose">
+      <h2 id="demo2-title">Everyone looks at once</h2>
+      <p>You clicked one word at a time, but the model doesn’t take turns. Every word runs its lookback simultaneously, in one big grid: rows ask, columns answer. Darker means “matters more”.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">the whole grid · hover a row</span>
+        <button class="btn small" id="grid-reset">reset</button>
+      </div>
+      <div class="stage-body" id="grid-demo"></div>
+    </div>
+    <p class="hint">Hover any row: it’s the same picture as the arcs above, one row per word. The empty top-right triangle is the “no peeking ahead” rule.</p>
+  </section>
+
+  <!-- ============ Heads ============ -->
+  <section class="section" aria-labelledby="heads-title">
+    <div class="prose">
+      <h2 id="heads-title">Many spotlights, not one</h2>
+      <p>One lookback pattern can’t catch everything: “who does <em>it</em> refer to?” is a different question from “which verb does this word belong to?”. So the model runs dozens of these lookbacks in parallel, each with its own questions and name tags. Each one is called a <strong>head</strong>. In the hero demo, try switching heads: the <em>reference</em> head hunts for pronouns’ owners, while the <em>nearby</em> head just watches recent words, useful for grammar glue.</p>
+      <p>A real model like the ones behind modern chatbots stacks up to a hundred heads per layer and dozens of layers. But every single one is doing exactly what you just did with your mouse: pick a word, look back, decide what matters, blend.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../embeddings/"><span class="dir">← previous</span>Meaning as a map</a>
+    <a class="next" href="../layers/"><span class="dir">next →</span>Neurons &amp; layers</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/attention.js"></script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed · Langsplain</title>
+<meta name="description" content="Why chatbots type so fast: play with the KV cache, quantization, and speculative decoding.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* ---- chapter 08 page styles ---- */
+
+  /* KV cache demo */
+  .kv-shelf {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+    padding: 0.45rem 0.65rem;
+    border: 2px dashed var(--mint-deep);
+    border-radius: var(--r-chip);
+    background: var(--mint-tint);
+  }
+  .kv-shelf-label {
+    font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600;
+    color: var(--mint-deep); margin-right: 0.15rem;
+  }
+  .token.reading {
+    background: var(--cobalt); color: oklch(0.97 0.01 262);
+    transform: translateY(-2px); box-shadow: 0 3px 0 var(--ink);
+  }
+  .counter {
+    font-family: var(--font-mono); font-size: 0.9rem; margin-top: 1.1rem;
+    min-height: 1.5em;
+  }
+  .score-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+  .score-slot {
+    border: 2px solid var(--line); border-radius: var(--r-chip);
+    padding: 0.45rem 0.9rem;
+    font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink-soft);
+    transition: border-color var(--t-med) var(--ease-out), background var(--t-med) var(--ease-out);
+  }
+  .score-slot.filled { border-color: var(--ink); color: var(--ink); background: var(--paper); }
+  .score-slot b { font-weight: 600; }
+  .demo-buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.25rem; }
+
+  /* Quantization demo */
+  .q-readout {
+    font-family: var(--font-mono); font-size: clamp(1rem, 2.6vw, 1.3rem);
+    margin-bottom: 1rem;
+  }
+  .q-readout .was { color: var(--ink-faint); }
+  .q-readout .now { font-weight: 600; }
+  .q-ruler { display: block; width: 100%; height: auto; }
+  .membar-track {
+    height: 30px; border: var(--border-toy); border-radius: 999px;
+    overflow: hidden; margin-top: 1.25rem; background: var(--paper);
+  }
+  .membar-fill {
+    height: 100%; background: var(--coral); border-radius: 999px 0 0 999px;
+    transition: width var(--t-slow) var(--ease-out);
+  }
+  .membar-label {
+    font-family: var(--font-mono); font-size: 0.82rem; color: var(--ink-soft);
+    margin-top: 0.4rem;
+  }
+  .dotfield {
+    position: relative; height: 66px;
+    border: 2px solid var(--line); border-radius: var(--r-chip);
+    margin-top: 1.5rem; overflow: hidden; background: var(--paper);
+  }
+  .dotfield .dot {
+    position: absolute; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--mint); border: 1.5px solid var(--ink);
+    transform: translateX(-50%);
+    transition: left var(--t-slow) var(--ease-out);
+  }
+
+  /* Speculative decoding demo */
+  .cast { display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; margin-bottom: 1.4rem; }
+  .cast .who {
+    display: flex; align-items: center; gap: 0.6rem;
+    font-size: 0.85rem; font-weight: 700; color: var(--ink-soft);
+    transition: color var(--t-fast) var(--ease-out);
+  }
+  .cast .face {
+    border-radius: 50%; border: var(--border-toy); background: var(--paper-deep);
+    flex: none;
+    transition: background var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+  }
+  .face.small { width: 24px; height: 24px; }
+  .face.big { width: 46px; height: 46px; }
+  .who.active { color: var(--ink); }
+  .who.active .face { background: var(--marigold); transform: scale(1.12); }
+  .stripwrap { position: relative; }
+  .token.draft { background: var(--paper-deep); border-style: dashed; color: var(--ink-soft); }
+  .token.reject { background: var(--coral); color: oklch(0.98 0.01 25); }
+  .token.discard { opacity: 0.15; transform: translateY(6px) scale(0.9); }
+  .sweep {
+    position: absolute; width: 34px; border-radius: var(--r-chip);
+    background: var(--marigold); opacity: 0.5; pointer-events: none;
+    transition: left 520ms var(--ease-out);
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="../">langsplain<span class="dot">.</span></a>
+    <div class="nav-links">
+      <a href="../#journey">All chapters</a>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+  <header class="chapter-head">
+    <p class="kicker"><b>08</b> / speed</p>
+    <h1>Why it types so fast</h1>
+    <p class="lede">A model writes one token at a time, and each token is a full trip through the network. It still outruns your reading speed thanks to three tricks. Here they are, playable.</p>
+  </header>
+
+  <!-- ============ Demo 1: KV cache ============ -->
+  <section class="section" aria-labelledby="kv-title">
+    <div class="prose">
+      <h2 id="kv-title">Stop re-reading your own homework</h2>
+      <p>Since everything comes out one token at a time, speed is just the work per token. And the naive recipe is embarrassing: to pick the next word, re-read the entire conversation from scratch, every single time. The fix is the <strong>KV cache</strong>: the model keeps notes on every token it has already digested, so each new token only does its own share of the reading.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">kv cache · watch the work add up</span>
+        <div class="seg" role="group" aria-label="Cache mode" id="kv-mode"></div>
+      </div>
+      <div class="stage-body" id="kv-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Play a full sentence with <em>re-read every time</em>, then flip to <em>remember it (cache)</em> and play again. Same sentence, a fifth of the work.</p>
+  </section>
+
+  <!-- ============ Demo 2: quantization ============ -->
+  <section class="section" aria-labelledby="q-title">
+    <div class="prose">
+      <h2 id="q-title">Fuzzier numbers, same brain</h2>
+      <p>Every weight in the model is a number, billions of them, and every single one gets hauled out of memory for every token. The hauling is the bottleneck. So shrink the numbers: store each weight with fewer bits. That is <strong>quantization</strong>, and it works by snapping every value onto a coarser grid of allowed levels.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">quantization · one weight on a precision ruler</span>
+        <div class="seg" role="group" aria-label="Bits per weight" id="q-bits"></div>
+      </div>
+      <div class="stage-body" id="q-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Step down the bits and watch the marker snap to the nearest allowed tick. Mostly you can't tell the difference. That's the trick.</p>
+  </section>
+
+  <!-- ============ Demo 3: speculative decoding ============ -->
+  <section class="section" aria-labelledby="sp-title">
+    <div class="prose">
+      <h2 id="sp-title">A little helper who guesses ahead</h2>
+      <p>One more trick, and it is sneaky: <strong>checking is faster than writing</strong>. A big model can verify a whole run of proposed tokens in a single pass, the same way you can skim someone else's draft far faster than you could write it. So a tiny, fast model drafts a few tokens ahead, and the big model plays editor. Where the editor agrees, the drafts are kept for free. Where it disagrees, it crosses one out, writes its own word, and the drafter picks up from there.</p>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">speculative decoding · drafter vs verifier</span>
+        <button class="btn small" id="sp-reset">reset</button>
+      </div>
+      <div class="stage-body" id="sp-demo">
+        <noscript><p>This demo needs JavaScript.</p></noscript>
+      </div>
+    </div>
+    <p class="hint">Grey chips are cheap guesses. One marigold sweep is the big model checking all of them at once. Mint stays, coral gets corrected.</p>
+  </section>
+
+  <!-- ============ Closing ============ -->
+  <section class="section" aria-labelledby="close-title">
+    <div class="prose">
+      <h2 id="close-title">Three trades, one fast chatbot</h2>
+      <p>None of it is free. The cache trades <strong>memory for time</strong>: keep the notes, skip the re-reading. Quantization trades <strong>precision for memory</strong>: fuzzier weights, smaller haul. Speculation trades <strong>a little extra compute for wall-clock speed</strong>: some drafts get thrown away, but you never sit waiting for the big model to write what a small one could have guessed.</p>
+      <p>All three were running in the chatbot you used this morning. That eerie, faster-than-thought typing is a stack of small bargains.</p>
+    </div>
+  </section>
+
+  <nav class="pager wrap" aria-label="Chapters">
+    <a href="../experts/"><span class="dir">← previous</span>Mixture of Experts</a>
+    <a class="next" href="../training/"><span class="dir">next →</span>Training</a>
+  </nav>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Langsplain is an interactive tour of how language models work. The demos are toy-sized but honest: they compute what they show.</p>
+</footer>
+
+<script type="module" src="../assets/js/speed.js"></script>
+</body>
+</html>
